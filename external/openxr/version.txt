@@ -1,0 +1,3 @@
+src = https://github.com/KhronosGroup/OpenXR-SDK
+
+win = release-1.0.25
