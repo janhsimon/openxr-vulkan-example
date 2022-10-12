@@ -752,12 +752,6 @@ Headset::Headset()
     return;
   }
 
-  if (eyeCount == 0u)
-  {
-    error = Error::OpenXR;
-    return;
-  }
-
   // Get eye image info per eye
   xr.eyeImageInfos.resize(eyeCount);
   for (XrViewConfigurationView& eyeInfo : xr.eyeImageInfos)
@@ -850,12 +844,6 @@ Headset::Headset()
       uint32_t swapchainImageCount;
       result = xrEnumerateSwapchainImages(swapchain, 0, &swapchainImageCount, nullptr);
       if (XR_FAILED(result))
-      {
-        error = Error::OpenXR;
-        return;
-      }
-
-      if (swapchainImageCount == 0u)
       {
         error = Error::OpenXR;
         return;
