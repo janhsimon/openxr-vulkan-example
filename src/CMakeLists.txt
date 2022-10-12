@@ -6,7 +6,7 @@ set(SHADER_SRC
 )
 
 set(SRC
-  Game.cpp
+  Main.cpp
   
   Buffer.cpp
   Buffer.h
