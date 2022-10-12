@@ -54,10 +54,10 @@ add_custom_command(
 foreach(SHADER ${SHADER_SRC})
   set(SHADER_INPUT "${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}")
   add_custom_command(
-    OUTPUT "${SHADER}"
+    TARGET ${TARGET_NAME}
+    DEPENDS ${SHADER_INPUT}
     COMMAND glslc
     ARGS --target-env=vulkan1.3 ${SHADER_INPUT} -std=450core -O -o "$<TARGET_FILE_DIR:${TARGET_NAME}>/${SHADER}.spv" $<$<NOT:$<CONFIG:DEBUG>>:-O>
-    MAIN_DEPENDENCY ${SHADER_INPUT}
     COMMENT ${SHADER}
   )
 endforeach()
