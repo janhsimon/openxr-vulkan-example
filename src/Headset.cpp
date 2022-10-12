@@ -146,12 +146,6 @@ Headset::Headset()
       return;
     }
 
-    if (instanceExtensionCount == 0u)
-    {
-      error = Error::OpenXR;
-      return;
-    }
-
     supportedOpenXRInstanceExtensions.resize(instanceExtensionCount);
     for (XrExtensionProperties& extensionProperty : supportedOpenXRInstanceExtensions)
     {
@@ -317,12 +311,6 @@ Headset::Headset()
       return;
     }
 
-    if (environmentBlendModeCount == 0u)
-    {
-      error = Error::OpenXR;
-      return;
-    }
-
     std::vector<XrEnvironmentBlendMode> supportedEnvironmentBlendModes(environmentBlendModeCount);
     result = xrEnumerateEnvironmentBlendModes(xr.instance, xr.systemId, viewType, environmentBlendModeCount,
                                               &environmentBlendModeCount, supportedEnvironmentBlendModes.data());
@@ -354,12 +342,6 @@ Headset::Headset()
   {
     uint32_t instanceExtensionCount;
     if (vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr) != VK_SUCCESS)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-
-    if (instanceExtensionCount == 0u)
     {
       error = Error::Vulkan;
       return;
@@ -447,12 +429,6 @@ Headset::Headset()
     std::vector<VkLayerProperties> supportedInstanceLayers;
     uint32_t instanceLayerCount;
     if (vkEnumerateInstanceLayerProperties(&instanceLayerCount, nullptr) != VK_SUCCESS)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-
-    if (instanceLayerCount == 0u)
     {
       error = Error::Vulkan;
       return;
@@ -565,12 +541,6 @@ Headset::Headset()
     uint32_t queueFamilyCount;
     vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, nullptr);
 
-    if (queueFamilyCount == 0u)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-
     queueFamilies.resize(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, queueFamilies.data());
 
@@ -607,12 +577,6 @@ Headset::Headset()
   {
     uint32_t deviceExtensionCount;
     if (vkEnumerateDeviceExtensionProperties(vk.physicalDevice, nullptr, &deviceExtensionCount, nullptr) != VK_SUCCESS)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-
-    if (deviceExtensionCount == 0u)
     {
       error = Error::Vulkan;
       return;
@@ -824,12 +788,6 @@ Headset::Headset()
     uint32_t formatCount = 0u;
     result = xrEnumerateSwapchainFormats(xr.session, 0u, &formatCount, nullptr);
     if (XR_FAILED(result))
-    {
-      error = Error::OpenXR;
-      return;
-    }
-
-    if (formatCount == 0u)
     {
       error = Error::OpenXR;
       return;

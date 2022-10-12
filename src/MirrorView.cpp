@@ -74,12 +74,6 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
     uint32_t queueFamilyCount = 0u;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
 
-    if (queueFamilyCount == 0u)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-
     queueFamilies.resize(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
@@ -501,11 +495,6 @@ bool MirrorView::recreateSwapchain()
       return false;
     }
 
-    if (surfaceFormatCount == 0u)
-    {
-      return false;
-    }
-
     std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
     if (vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data()) !=
         VK_SUCCESS)
@@ -557,11 +546,6 @@ bool MirrorView::recreateSwapchain()
   std::vector<VkImage> swapchainImages;
   uint32_t swapchainImageCount = 0u;
   if (vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr) != VK_SUCCESS)
-  {
-    return false;
-  }
-
-  if (swapchainImageCount == 0u)
   {
     return false;
   }
