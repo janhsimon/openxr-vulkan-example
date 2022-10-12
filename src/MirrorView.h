@@ -11,20 +11,27 @@ class RenderTarget;
 class MirrorView final
 {
 public:
+  enum class Error
+  {
+    Success,
+    GLFW,
+    Vulkan
+  };
+
   MirrorView(const Headset* headset);
 
-  void destroy();
+  void destroy() const; // Only call when construction succeeded
 
   void onWindowResize();
 
   void processWindowEvents() const;
-  bool render(VkImage sourceImage, VkExtent2D resolution);
+  void render(VkImage sourceImage, VkExtent2D resolution);
 
-  bool isValid() const;
+  Error getError() const;
   bool windowShouldClose() const;
 
 private:
-  bool valid = true;
+  Error error = Error::Success;
 
   const Headset* headset = nullptr;
   GLFWwindow* window = nullptr;
@@ -42,5 +49,5 @@ private:
   bool resizeDetected = false;
 
   bool recreateSwapchain();
-  void destroySwapchain();
+  void destroySwapchain() const;
 };

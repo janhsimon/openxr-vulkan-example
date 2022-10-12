@@ -29,7 +29,7 @@ set(SRC
 add_executable(${TARGET_NAME})
 target_sources(${TARGET_NAME} PRIVATE ${SRC})
 target_include_directories(${TARGET_NAME} PRIVATE ${Vulkan_INCLUDE_DIRS})
-target_link_libraries(${TARGET_NAME} PRIVATE glfw glm openxr ${Vulkan_LIBRARIES})
+target_link_libraries(${TARGET_NAME} PRIVATE boxer glfw glm openxr ${Vulkan_LIBRARIES})
 
 target_compile_definitions(${TARGET_NAME} PRIVATE $<$<CONFIG:Debug>:DEBUG>) # Add a clean DEBUG prepocessor define if applicable
 set_target_properties(${TARGET_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${TARGET_NAME}>") # For MSVC debugging

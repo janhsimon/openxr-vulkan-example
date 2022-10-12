@@ -3,6 +3,8 @@
 #include "RenderTarget.h"
 #include "Renderer.h"
 
+#include <boxer/boxer.h>
+
 namespace
 {
 inline constexpr size_t mirrorEyeIndex = 1u; // Index of eye to mirror, 0 = left, 1 = right
@@ -11,20 +13,39 @@ inline constexpr size_t mirrorEyeIndex = 1u; // Index of eye to mirror, 0 = left
 int main()
 {
   Headset headset;
-  if (!headset.isValid())
+  if (headset.getError() == Headset::Error::NoHeadsetDetected)
   {
+    boxer::show("No headset detected.\nPlease make sure that your headset connected and running.", "Error",
+                boxer::Style::Error);
+    return EXIT_FAILURE;
+  }
+  else if (headset.getError() == Headset::Error::OpenXR)
+  {
+    boxer::show("Headset encountered generic OpenXR error.", "Error", boxer::Style::Error);
+    return EXIT_FAILURE;
+  }
+  else if (headset.getError() == Headset::Error::Vulkan)
+  {
+    boxer::show("Headset encountered generic Vulkan error.", "Error", boxer::Style::Error);
     return EXIT_FAILURE;
   }
 
   MirrorView mirrorView(&headset);
-  if (!mirrorView.isValid())
+  if (mirrorView.getError() == MirrorView::Error::GLFW)
   {
+    boxer::show("Mirror view encountered generic GLFW error.", "Error", boxer::Style::Error);
+    return EXIT_FAILURE;
+  }
+  else if (mirrorView.getError() == MirrorView::Error::Vulkan)
+  {
+    boxer::show("Mirror view encountered generic Vulkan error.", "Error", boxer::Style::Error);
     return EXIT_FAILURE;
   }
 
   Renderer renderer(&headset);
   if (!renderer.isValid())
   {
+    boxer::show("Renderer encountered generic Vulkan error.", "Error", boxer::Style::Error);
     return EXIT_FAILURE;
   }
 
@@ -48,38 +69,23 @@ int main()
       for (size_t eyeIndex = 0u; eyeIndex < headset.getEyeCount(); ++eyeIndex)
       {
         uint32_t swapchainImageIndex;
-        if (!headset.beginEye(eyeIndex, swapchainImageIndex))
-        {
-          return EXIT_FAILURE;
-        }
+        headset.beginEye(eyeIndex, swapchainImageIndex);
 
         if (eyeIndex == mirrorEyeIndex)
         {
           mirrorSwapchainImageIndex = swapchainImageIndex;
         }
 
-        if (!renderer.render(eyeIndex, swapchainImageIndex))
-        {
-          return EXIT_FAILURE;
-        }
+        renderer.render(eyeIndex, swapchainImageIndex);
 
-        if (!headset.endEye(eyeIndex))
-        {
-          return EXIT_FAILURE;
-        }
+        headset.endEye(eyeIndex);
       }
     }
 
-    if (!headset.endFrame())
-    {
-      return EXIT_FAILURE;
-    }
+    headset.endFrame();
 
     const VkImage mirrorImage = headset.getEyeRenderTarget(mirrorEyeIndex, mirrorSwapchainImageIndex)->getImage();
-    if (!mirrorView.render(mirrorImage, headset.getEyeResolution(mirrorEyeIndex)))
-    {
-      return EXIT_FAILURE;
-    }
+    mirrorView.render(mirrorImage, headset.getEyeResolution(mirrorEyeIndex));
   }
 
   headset.sync(); // Sync before destroying so that resources are free

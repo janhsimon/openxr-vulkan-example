@@ -5,8 +5,6 @@
 
 #include <glfw/glfw3.h>
 
-#include <iostream>
-
 namespace
 {
 inline constexpr VkExtent2D windowSize = { 640, 480 };
@@ -25,15 +23,13 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
 {
   if (!glfwInit())
   {
-    std::cerr << "Failed to initialize GLFW\n";
-    valid = false;
+    error = Error::GLFW;
     return;
   }
 
   if (!glfwVulkanSupported())
   {
-    std::cerr << "Vulkan not supported\n";
-    valid = false;
+    error = Error::GLFW;
     return;
   }
 
@@ -52,6 +48,11 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   window = glfwCreateWindow(width, height, windowTitle, monitor, nullptr);
+  if (!window)
+  {
+    error = Error::GLFW;
+    return;
+  }
 
   glfwSetWindowUserPointer(window, this);
   glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
@@ -60,8 +61,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
   VkResult result = glfwCreateWindowSurface(headset->getInstance(), window, nullptr, &surface);
   if (result != VK_SUCCESS)
   {
-    std::cerr << "Failed to create window surface\n";
-    valid = false;
+    error = Error::GLFW;
     return;
   }
 
@@ -76,8 +76,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
 
     if (queueFamilyCount == 0u)
     {
-      std::cerr << "Found zero queue families for physical device\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
@@ -110,8 +109,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
       if (vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, static_cast<uint32_t>(queueFamilyIndexCandidate),
                                                surface, &presentSupport) != VK_SUCCESS)
       {
-        std::cerr << "Failed to determine queue family surface support for physical device\n";
-        valid = false;
+        error = Error::Vulkan;
         return;
       }
 
@@ -130,8 +128,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
 
     if (!drawQueueFamilyIndexFound || !presentQueueFamilyIndexFound)
     {
-      std::cerr << "Required queue families not supported for physical device\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
   }
@@ -168,8 +165,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
     renderPassCreateInfo.pSubpasses = &subpassDescription;
     if (vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS)
     {
-      std::cerr << "Failed to create render pass\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
   }
@@ -177,7 +173,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
   // Create swapchain and render targets
   if (!recreateSwapchain())
   {
-    valid = false;
+    error = Error::Vulkan;
     return;
   }
 
@@ -187,8 +183,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
   commandPoolCreateInfo.queueFamilyIndex = drawQueueFamilyIndex;
   if (vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create command pool\n";
-    valid = false;
+    error = Error::Vulkan;
     return;
   }
 
@@ -199,8 +194,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
   commandBufferAllocateInfo.commandBufferCount = 1u;
   if (vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer) != VK_SUCCESS)
   {
-    std::cerr << "Failed to allocate command buffers\n";
-    valid = false;
+    error = Error::Vulkan;
     return;
   }
 
@@ -208,15 +202,13 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
   VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
   if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create semaphore\n";
-    valid = false;
+    error = Error::Vulkan;
     return;
   }
 
   if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create semaphore\n";
-    valid = false;
+    error = Error::Vulkan;
     return;
   }
 
@@ -225,20 +217,13 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
   if (vkCreateFence(device, &fenceCreateInfo, nullptr, &inFlightFence) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create memory fence\n";
-    valid = false;
+    error = Error::Vulkan;
     return;
   }
 }
 
-void MirrorView::destroy()
+void MirrorView::destroy() const
 {
-  if (!valid)
-  {
-    return;
-  }
-  valid = false;
-
   const VkDevice device = headset->getDevice();
   vkDestroyFence(device, inFlightFence, nullptr);
   vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
@@ -264,14 +249,13 @@ void MirrorView::processWindowEvents() const
   glfwPollEvents();
 }
 
-bool MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
+void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
 {
   const VkDevice device = headset->getDevice();
 
   if (vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
   {
-    std::cerr << "Failed to wait for mirror view memory fences\n";
-    return false;
+    return;
   }
 
   if (renderSize.width == 0u || renderSize.height == 0u)
@@ -282,13 +266,13 @@ bool MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
       resizeDetected = false;
       if (!recreateSwapchain())
       {
-        return false;
+        return;
       }
     }
     else
     {
-      // Otherwise skip minized frames
-      return true;
+      // Otherwise skip minimized frames
+      return;
     }
   }
 
@@ -298,33 +282,30 @@ bool MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   if (result == VK_ERROR_OUT_OF_DATE_KHR)
   {
     // Recreate tswapchain and then stop rendering this frame as it is out of date already
-    return recreateSwapchain();
+    recreateSwapchain();
+    return;
   }
   else if (result != VK_SUBOPTIMAL_KHR && result != VK_SUCCESS)
   {
     // Just continue in case of a suboptimal
-    std::cerr << "Failed to acquire mirror view swapchain image\n";
-    return false;
+    return;
   }
 
   if (vkResetFences(device, 1, &inFlightFence) != VK_SUCCESS)
   {
-    std::cerr << "Failed to reset mirror view memory fence\n";
-    return false;
+    return;
   }
 
   // Reset and begin recording command buffer
   if (vkResetCommandBuffer(commandBuffer, 0u) != VK_SUCCESS)
   {
-    std::cerr << "Failed to reset mirror view command buffer\n";
-    return false;
+    return;
   }
 
   VkCommandBufferBeginInfo commandBufferBeginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   if (vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS)
   {
-    std::cerr << "Failed to begin mirror view command buffer recording\n";
-    return false;
+    return;
   }
 
   VkImage destinationImage = swapchainRenderTargets.at(destinationImageIndex)->getImage();
@@ -414,8 +395,7 @@ bool MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   // End recording command buffer
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
   {
-    std::cerr << "Failed to end mirror view command buffer recording\n";
-    return false;
+    return;
   }
 
   // Render
@@ -431,8 +411,7 @@ bool MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
   if (vkQueueSubmit(drawQueue, 1u, &submitInfo, inFlightFence) != VK_SUCCESS)
   {
-    std::cerr << "Failed to submit mirror view graphics queue\n";
-    return false;
+    return;
   }
 
   // Present
@@ -449,21 +428,18 @@ bool MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
     // Recreate swapchain for the next frame if necessary
     if (!recreateSwapchain())
     {
-      return false;
+      return;
     }
   }
   else if (result != VK_SUCCESS)
   {
-    std::cerr << "Failed to present mirror view\n";
-    return false;
+    return;
   }
-
-  return true;
 }
 
-bool MirrorView::isValid() const
+MirrorView::Error MirrorView::getError() const
 {
-  return valid;
+  return error;
 }
 
 bool MirrorView::windowShouldClose() const
@@ -483,13 +459,11 @@ bool MirrorView::recreateSwapchain()
   {
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities) != VK_SUCCESS)
     {
-      std::cerr << "Failed to get surface capabilities of physical device\n";
       return false;
     }
 
     if (!(surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT))
     {
-      std::cerr << "Surface does not supported transfer usage\n";
       return false;
     }
 
@@ -524,13 +498,11 @@ bool MirrorView::recreateSwapchain()
     uint32_t surfaceFormatCount = 0u;
     if (vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, nullptr) != VK_SUCCESS)
     {
-      std::cerr << "Failed to enumerate surface formats for physical device\n";
       return false;
     }
 
     if (surfaceFormatCount == 0u)
     {
-      std::cerr << "Found zero surface formats for physical device\n";
       return false;
     }
 
@@ -538,7 +510,6 @@ bool MirrorView::recreateSwapchain()
     if (vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data()) !=
         VK_SUCCESS)
     {
-      std::cerr << "Failed to retrieve surface formats for physical device\n";
       return false;
     }
 
@@ -556,7 +527,6 @@ bool MirrorView::recreateSwapchain()
 
     if (!surfaceFormatFound)
     {
-      std::cerr << "Required surface format not found\n";
       return false;
     }
   }
@@ -580,7 +550,6 @@ bool MirrorView::recreateSwapchain()
   swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   if (vkCreateSwapchainKHR(device, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create mirror view swapchain\n";
     return false;
   }
 
@@ -589,20 +558,17 @@ bool MirrorView::recreateSwapchain()
   uint32_t swapchainImageCount = 0u;
   if (vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr) != VK_SUCCESS)
   {
-    std::cerr << "Failed to enumerate mirror view swapchain images\n";
     return false;
   }
 
   if (swapchainImageCount == 0u)
   {
-    std::cerr << "Found zero mirror view swapchain images\n";
     return false;
   }
 
   swapchainImages.resize(swapchainImageCount);
   if (vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages.data()) != VK_SUCCESS)
   {
-    std::cerr << "Failed to retrieve mirror view swapchain images\n";
     return false;
   }
 
@@ -623,13 +589,12 @@ bool MirrorView::recreateSwapchain()
   return true;
 }
 
-void MirrorView::destroySwapchain()
+void MirrorView::destroySwapchain() const
 {
   for (RenderTarget* renderTarget : swapchainRenderTargets)
   {
     renderTarget->destroy();
     delete renderTarget;
-    renderTarget = nullptr;
   }
 
   vkDestroySwapchainKHR(headset->getDevice(), swapchain, nullptr);

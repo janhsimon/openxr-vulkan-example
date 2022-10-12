@@ -7,7 +7,9 @@
 #include <array>
 #include <sstream>
 
-#include <iostream>
+#ifdef DEBUG
+  #include <iostream>
+#endif
 
 namespace
 {
@@ -21,7 +23,6 @@ bool loadXrExtensionFunction(XrInstance instance, const std::string& name, PFN_x
   const XrResult result = xrGetInstanceProcAddr(instance, name.c_str(), function);
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to find OpenXR extension function \"" << name << "\"\n";
     return false;
   }
 
@@ -30,13 +31,7 @@ bool loadXrExtensionFunction(XrInstance instance, const std::string& name, PFN_x
 
 PFN_vkVoidFunction loadVkExtensionFunction(VkInstance instance, const std::string& name)
 {
-  const PFN_vkVoidFunction function = vkGetInstanceProcAddr(instance, name.c_str());
-  if (!function)
-  {
-    std::cerr << "Failed to find Vulkan extension function \"" << name << "\"\n";
-  }
-
-  return function;
+  return vkGetInstanceProcAddr(instance, name.c_str());
 }
 
 std::vector<const char*> extensionStringToVector(const std::string& string)
@@ -147,15 +142,13 @@ Headset::Headset()
     XrResult result = xrEnumerateInstanceExtensionProperties(nullptr, 0u, &instanceExtensionCount, nullptr);
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to enumerate supported OpenXR instance extensions\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
     if (instanceExtensionCount == 0u)
     {
-      std::cerr << "Found zero supported OpenXR instance extensions\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
@@ -170,8 +163,7 @@ Headset::Headset()
                                                     supportedOpenXRInstanceExtensions.data());
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to retrieve supported OpenXR instance extensions\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
   }
@@ -207,8 +199,7 @@ Headset::Headset()
 
       if (!extensionSupported)
       {
-        std::cerr << "Required OpenXR instance extension \"" << extension << "\" not supported\n";
-        valid = false;
+        error = Error::OpenXR;
         return;
       }
     }
@@ -220,8 +211,7 @@ Headset::Headset()
     const XrResult result = xrCreateInstance(&instanceCreateInfo, &xr.instance);
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to create OpenXR instance\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
   }
@@ -230,28 +220,28 @@ Headset::Headset()
   if (!loadXrExtensionFunction(xr.instance, "xrGetVulkanInstanceExtensionsKHR",
                                reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanInstanceExtensionsKHR)))
   {
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
   if (!loadXrExtensionFunction(xr.instance, "xrGetVulkanDeviceExtensionsKHR",
                                reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanDeviceExtensionsKHR)))
   {
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
   if (!loadXrExtensionFunction(xr.instance, "xrGetVulkanGraphicsDeviceKHR",
                                reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanGraphicsDeviceKHR)))
   {
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
   if (!loadXrExtensionFunction(xr.instance, "xrGetVulkanGraphicsRequirementsKHR",
                                reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanGraphicsRequirementsKHR)))
   {
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
@@ -261,14 +251,14 @@ Headset::Headset()
     if (!loadXrExtensionFunction(xr.instance, "xrCreateDebugUtilsMessengerEXT",
                                  reinterpret_cast<PFN_xrVoidFunction*>(&xr.createDebugUtilsMessengerEXT)))
     {
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
     if (!loadXrExtensionFunction(xr.instance, "xrDestroyDebugUtilsMessengerEXT",
                                  reinterpret_cast<PFN_xrVoidFunction*>(&xr.destroyDebugUtilsMessengerEXT)))
     {
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
@@ -300,8 +290,7 @@ Headset::Headset()
       xr.createDebugUtilsMessengerEXT(xr.instance, &debugUtilsMessengerCreateInfo, &xr.debugUtilsMessenger);
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to create OpenXR debug utils messenger\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
   }
@@ -313,8 +302,7 @@ Headset::Headset()
   XrResult result = xrGetSystem(xr.instance, &systemGetInfo, &xr.systemId);
   if (XR_FAILED(result))
   {
-    std::cerr << "No head-mounted display detected, is your headset connected and running?\n";
-    valid = false;
+    error = Error::NoHeadsetDetected;
     return;
   }
 
@@ -325,15 +313,13 @@ Headset::Headset()
       xrEnumerateEnvironmentBlendModes(xr.instance, xr.systemId, viewType, 0u, &environmentBlendModeCount, nullptr);
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to enumerate supported environment blend modes\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
     if (environmentBlendModeCount == 0u)
     {
-      std::cerr << "Found zero supported environment blend modes\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
@@ -342,8 +328,7 @@ Headset::Headset()
                                               &environmentBlendModeCount, supportedEnvironmentBlendModes.data());
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to retrieve supported environment blend modes\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
@@ -359,8 +344,7 @@ Headset::Headset()
 
     if (!modeFound)
     {
-      std::cerr << "Required environment blend mode not supported\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
   }
@@ -371,15 +355,13 @@ Headset::Headset()
     uint32_t instanceExtensionCount;
     if (vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr) != VK_SUCCESS)
     {
-      std::cerr << "Failed to enumerate supported Vulkan instance extensions\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
     if (instanceExtensionCount == 0u)
     {
-      std::cerr << "Found zero supported Vulkan instance extensions\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
@@ -387,8 +369,7 @@ Headset::Headset()
     if (vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount,
                                                supportedVulkanInstanceExtensions.data()) != VK_SUCCESS)
     {
-      std::cerr << "Failed to retrieve supported Vulkan instance extensions\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
   }
@@ -400,8 +381,7 @@ Headset::Headset()
     result = xr.getVulkanInstanceExtensionsKHR(xr.instance, xr.systemId, 0u, &count, nullptr);
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to get required Vulkan instance extensions\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
@@ -410,8 +390,8 @@ Headset::Headset()
     result = xr.getVulkanInstanceExtensionsKHR(xr.instance, xr.systemId, count, &count, buffer.data());
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to retrieve required Vulkan instance extensions\n";
-      valid = false;
+      error = Error::OpenXR;
+
       return;
     }
 
@@ -440,8 +420,7 @@ Headset::Headset()
 
       if (!extensionSupported)
       {
-        std::cerr << "Required Vulkan instance extension \"" << extension << "\" not supported\n";
-        valid = false;
+        error = Error::Vulkan;
         return;
       }
     }
@@ -469,23 +448,20 @@ Headset::Headset()
     uint32_t instanceLayerCount;
     if (vkEnumerateInstanceLayerProperties(&instanceLayerCount, nullptr) != VK_SUCCESS)
     {
-      std::cerr << "Failed to enumerate supported Vulkan instance layers\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
     if (instanceLayerCount == 0u)
     {
-      std::cerr << "Found zero supported Vulkan instance layers\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
     supportedInstanceLayers.resize(instanceLayerCount);
     if (vkEnumerateInstanceLayerProperties(&instanceLayerCount, supportedInstanceLayers.data()) != VK_SUCCESS)
     {
-      std::cerr << "Failed to retrieve supported Vulkan instance layers\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
@@ -504,8 +480,7 @@ Headset::Headset()
 
       if (!layerSupported)
       {
-        std::cerr << "Required Vulkan instance layer \"" << layer << "\" not supported\n";
-        valid = false;
+        error = Error::Vulkan;
         return;
       }
     }
@@ -516,8 +491,7 @@ Headset::Headset()
 
     if (vkCreateInstance(&instanceCreateInfo, nullptr, &vk.instance) != VK_SUCCESS)
     {
-      std::cerr << "Failed to create Vulkan instance\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
   }
@@ -529,7 +503,7 @@ Headset::Headset()
       loadVkExtensionFunction(vk.instance, "vkCreateDebugUtilsMessengerEXT"));
     if (!vk.createDebugUtilsMessengerEXT)
     {
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
@@ -537,7 +511,7 @@ Headset::Headset()
       loadVkExtensionFunction(vk.instance, "vkDestroyDebugUtilsMessengerEXT"));
     if (!vk.destroyDebugUtilsMessengerEXT)
     {
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
@@ -570,8 +544,7 @@ Headset::Headset()
     if (vk.createDebugUtilsMessengerEXT(vk.instance, &debugUtilsMessengerCreateInfo, nullptr,
                                         &vk.debugUtilsMessenger) != VK_SUCCESS)
     {
-      std::cerr << "Failed to create Vulkan debug utils messenger\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
   }
@@ -581,8 +554,7 @@ Headset::Headset()
   result = xr.getVulkanGraphicsDeviceKHR(xr.instance, xr.systemId, vk.instance, &vk.physicalDevice);
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to retrieve physical device from OpenXR\n";
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
@@ -595,8 +567,7 @@ Headset::Headset()
 
     if (queueFamilyCount == 0u)
     {
-      std::cerr << "Found zero queue families for physical device\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
@@ -626,8 +597,7 @@ Headset::Headset()
 
     if (!queueFamilyIndexFound)
     {
-      std::cerr << "Failed to find graphics queue for physical device\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
   }
@@ -638,15 +608,13 @@ Headset::Headset()
     uint32_t deviceExtensionCount;
     if (vkEnumerateDeviceExtensionProperties(vk.physicalDevice, nullptr, &deviceExtensionCount, nullptr) != VK_SUCCESS)
     {
-      std::cerr << "Failed to enumerate supported Vulkan device extensions\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
     if (deviceExtensionCount == 0u)
     {
-      std::cerr << "Found zero supported Vulkan device extensions\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
@@ -654,8 +622,7 @@ Headset::Headset()
     if (vkEnumerateDeviceExtensionProperties(vk.physicalDevice, nullptr, &deviceExtensionCount,
                                              supportedVulkanDeviceExtensions.data()) != VK_SUCCESS)
     {
-      std::cerr << "Failed to retrieve supported Vulkan device extensions\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
   }
@@ -667,8 +634,7 @@ Headset::Headset()
     XrResult result = xr.getVulkanDeviceExtensionsKHR(xr.instance, xr.systemId, 0u, &count, nullptr);
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to enumerate required Vulkan device extensions\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
@@ -677,8 +643,7 @@ Headset::Headset()
     result = xr.getVulkanDeviceExtensionsKHR(xr.instance, xr.systemId, count, &count, buffer.data());
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to retrieve required Vulkan device extensions\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
@@ -701,8 +666,7 @@ Headset::Headset()
 
       if (!extensionSupported)
       {
-        std::cerr << "Required Vulkan device extensions \"" << extension << "\" not supported\n";
-        valid = false;
+        error = Error::Vulkan;
         return;
       }
     }
@@ -725,8 +689,7 @@ Headset::Headset()
     vkGetPhysicalDeviceFeatures(vk.physicalDevice, &features);
     if (!features.shaderStorageImageMultisample)
     {
-      std::cerr << "Required Vulkan physical device feature \"Shader Storage Image Multisample\" not supported\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
 
@@ -738,8 +701,7 @@ Headset::Headset()
     deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
     if (vkCreateDevice(vk.physicalDevice, &deviceCreateInfo, nullptr, &vk.device) != VK_SUCCESS)
     {
-      std::cerr << "Failed to create Vulkan device\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
   }
@@ -749,8 +711,7 @@ Headset::Headset()
   result = xr.getVulkanGraphicsRequirementsKHR(xr.instance, xr.systemId, &graphicsRequirements);
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to retrieve Vulkan graphics requirements\n";
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
@@ -784,8 +745,7 @@ Headset::Headset()
     renderPassCreateInfo.pSubpasses = &subpassDescription;
     if (vkCreateRenderPass(vk.device, &renderPassCreateInfo, nullptr, &vk.renderPass) != VK_SUCCESS)
     {
-      std::cerr << "Failed to create render pass\n";
-      valid = false;
+      error = Error::Vulkan;
       return;
     }
   }
@@ -804,8 +764,7 @@ Headset::Headset()
   result = xrCreateSession(xr.instance, &sessionCreateInfo, &xr.session);
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to create OpenXR session\n";
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
@@ -816,8 +775,7 @@ Headset::Headset()
   result = xrCreateReferenceSpace(xr.session, &referenceSpaceCreateInfo, &xr.space);
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to create OpenXR reference space\n";
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
@@ -826,14 +784,13 @@ Headset::Headset()
                                              reinterpret_cast<uint32_t*>(&eyeCount), nullptr);
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to enumerate OpenXR views\n";
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
   if (eyeCount == 0u)
   {
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
@@ -850,8 +807,7 @@ Headset::Headset()
                                              reinterpret_cast<uint32_t*>(&eyeCount), xr.eyeImageInfos.data());
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to retrieve OpenXR views\n";
-    valid = false;
+    error = Error::OpenXR;
     return;
   }
 
@@ -869,15 +825,13 @@ Headset::Headset()
     result = xrEnumerateSwapchainFormats(xr.session, 0u, &formatCount, nullptr);
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to enumerate supported OpenXR swapchain formats\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
     if (formatCount == 0u)
     {
-      std::cerr << "Found zero supported OpenXR swapchain formats\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
@@ -885,8 +839,7 @@ Headset::Headset()
     result = xrEnumerateSwapchainFormats(xr.session, formatCount, &formatCount, formats.data());
     if (XR_FAILED(result))
     {
-      std::cerr << "Failed to retrieve supported OpenXR swapchain formats\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
 
@@ -902,8 +855,7 @@ Headset::Headset()
 
     if (!formatFound)
     {
-      std::cerr << "Required OpenXR swapchain format not supported\n";
-      valid = false;
+      error = Error::OpenXR;
       return;
     }
   }
@@ -932,8 +884,7 @@ Headset::Headset()
       result = xrCreateSwapchain(xr.session, &swapchainCreateInfo, &swapchain);
       if (XR_FAILED(result))
       {
-        std::cerr << "Failed to create OpenXR swapchain\n";
-        valid = false;
+        error = Error::OpenXR;
         return;
       }
 
@@ -942,15 +893,13 @@ Headset::Headset()
       result = xrEnumerateSwapchainImages(swapchain, 0, &swapchainImageCount, nullptr);
       if (XR_FAILED(result))
       {
-        std::cerr << "Failed to enumerate OpenXR swapchain images\n";
-        valid = false;
+        error = Error::OpenXR;
         return;
       }
 
       if (swapchainImageCount == 0u)
       {
-        std::cerr << "Found zero OpenXR swapchain images\n";
-        valid = false;
+        error = Error::OpenXR;
         return;
       }
 
@@ -967,8 +916,7 @@ Headset::Headset()
                                           &swapchainImageCount, data);
       if (XR_FAILED(result))
       {
-        std::cerr << "Failed to retrieve OpenXR swapchain images\n";
-        valid = false;
+        error = Error::OpenXR;
         return;
       }
 
@@ -983,7 +931,7 @@ Headset::Headset()
         renderTarget = new RenderTarget(vk.device, image, getEyeResolution(eyeIndex), colorFormat, vk.renderPass);
         if (!renderTarget->isValid())
         {
-          valid = false;
+          error = Error::Vulkan;
           return;
         }
       }
@@ -1019,14 +967,8 @@ void Headset::sync() const
   vkDeviceWaitIdle(vk.device);
 }
 
-void Headset::destroy()
+void Headset::destroy() const
 {
-  if (!valid)
-  {
-    return;
-  }
-  valid = false;
-
   // Clean up OpenXR
   xrEndSession(xr.session);
 
@@ -1180,7 +1122,7 @@ Headset::BeginFrameResult Headset::beginFrame()
   return BeginFrameResult::RenderFully; // Request full rendering of the frame
 }
 
-bool Headset::beginEye(size_t eyeIndex, uint32_t& swapchainImageIndex) const
+void Headset::beginEye(size_t eyeIndex, uint32_t& swapchainImageIndex) const
 {
   const XrSwapchain& swapchain = xr.eyeSwapchains.at(eyeIndex);
 
@@ -1189,8 +1131,7 @@ bool Headset::beginEye(size_t eyeIndex, uint32_t& swapchainImageIndex) const
   XrResult result = xrAcquireSwapchainImage(swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to acquire OpenXR swapchain image\n";
-    return false;
+    return;
   }
 
   // Wait for swapchain image
@@ -1199,14 +1140,11 @@ bool Headset::beginEye(size_t eyeIndex, uint32_t& swapchainImageIndex) const
   result = xrWaitSwapchainImage(swapchain, &swapchainImageWaitInfo);
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to wait for OpenXR swapchain image\n";
-    return false;
+    return;
   }
-
-  return true;
 }
 
-bool Headset::endEye(size_t eyeIndex) const
+void Headset::endEye(size_t eyeIndex) const
 {
   const XrSwapchain& swapchain = xr.eyeSwapchains.at(eyeIndex);
 
@@ -1215,14 +1153,11 @@ bool Headset::endEye(size_t eyeIndex) const
   const XrResult result = xrReleaseSwapchainImage(swapchain, &swapchainImageReleaseInfo);
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to release OpenXR swapchain image\n";
-    return false;
+    return;
   }
-
-  return true;
 }
 
-bool Headset::endFrame() const
+void Headset::endFrame() const
 {
   // End frame
   XrCompositionLayerProjection compositionLayerProjection{ XR_TYPE_COMPOSITION_LAYER_PROJECTION };
@@ -1249,16 +1184,13 @@ bool Headset::endFrame() const
   const XrResult result = xrEndFrame(xr.session, &frameEndInfo);
   if (XR_FAILED(result))
   {
-    std::cerr << "Failed to end OpenXR frame\n";
-    return false;
+    return;
   }
-
-  return true;
 }
 
-bool Headset::isValid() const
+Headset::Error Headset::getError() const
 {
-  return valid;
+  return error;
 }
 
 VkInstance Headset::getInstance() const

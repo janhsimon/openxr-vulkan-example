@@ -7,7 +7,7 @@ class RenderTarget final
 public:
   RenderTarget(VkDevice device, VkImage image, VkExtent2D size, VkFormat format, VkRenderPass renderPass);
 
-  void destroy();
+  void destroy() const; // Only call when construction succeeded
 
   bool isValid() const;
   VkImage getImage() const;

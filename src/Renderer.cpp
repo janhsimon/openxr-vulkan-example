@@ -8,7 +8,6 @@
 
 #include <array>
 #include <fstream>
-#include <iostream>
 
 namespace
 {
@@ -54,7 +53,6 @@ bool loadShaderFromFile(VkDevice device, const std::string& filename, VkShaderMo
 
   if (vkCreateShaderModule(device, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create shader module for \"" << filename << "\"\n";
     return false;
   }
 
@@ -83,7 +81,6 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   descriptorSetLayoutCreateInfo.pBindings = &descriptorSetLayoutBinding;
   if (vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create descriptor set layout\n";
     valid = false;
     return;
   }
@@ -99,7 +96,6 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   descriptorPoolCreateInfo.maxSets = 1u;
   if (vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create descriptor pool\n";
     valid = false;
     return;
   }
@@ -111,7 +107,6 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
   if (vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet) != VK_SUCCESS)
   {
-    std::cerr << "Failed to allocate descriptor set from pool\n";
     valid = false;
     return;
   }
@@ -136,7 +131,6 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   pipelineLayoutCreateInfo.setLayoutCount = 1u;
   if (vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create graphics pipeline layout\n";
     valid = false;
     return;
   }
@@ -230,13 +224,6 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   VkPipelineColorBlendAttachmentState pipelineColorBlendAttachmentState{};
   pipelineColorBlendAttachmentState.colorWriteMask =
     VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-  /*pipelineColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-  pipelineColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-  pipelineColorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
-  pipelineColorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-  pipelineColorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-  pipelineColorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;*/
-
   pipelineColorBlendAttachmentState.blendEnable = VK_TRUE;
   pipelineColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
   pipelineColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -269,7 +256,6 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   graphicsPipelineCreateInfo.renderPass = headset->getRenderPass();
   if (vkCreateGraphicsPipelines(device, nullptr, 1u, &graphicsPipelineCreateInfo, nullptr, &pipeline) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create graphics pipeline\n";
     valid = false;
     return;
   }
@@ -283,6 +269,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
                             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
   if (!vertexBuffer->isValid())
   {
+    valid = false;
     return;
   }
 
@@ -297,7 +284,6 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   commandPoolCreateInfo.queueFamilyIndex = headset->getQueueFamilyIndex();
   if (vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create command pool\n";
     valid = false;
     return;
   }
@@ -309,7 +295,6 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   commandBufferAllocateInfo.commandBufferCount = 1u;
   if (vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer) != VK_SUCCESS)
   {
-    std::cerr << "Failed to allocate command buffer from pool\n";
     valid = false;
     return;
   }
@@ -319,26 +304,18 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
   if (vkCreateFence(device, &fenceCreateInfo, nullptr, &fence) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create memory fence\n";
     valid = false;
     return;
   }
 }
 
-void Renderer::destroy()
+void Renderer::destroy() const
 {
-  if (!valid)
-  {
-    return;
-  }
-  valid = false;
-
   const VkDevice device = headset->getDevice();
   vkDestroyFence(device, fence, nullptr);
 
   vertexBuffer->destroy();
   delete vertexBuffer;
-  vertexBuffer = nullptr;
 
   vkDestroyCommandPool(device, commandPool, nullptr);
   vkDestroyPipeline(device, pipeline, nullptr);
@@ -348,15 +325,13 @@ void Renderer::destroy()
 
   uniformBuffer->destroy();
   delete uniformBuffer;
-  uniformBuffer = nullptr;
 }
 
-bool Renderer::render(size_t eyeIndex, size_t swapchainImageIndex) const
+void Renderer::render(size_t eyeIndex, size_t swapchainImageIndex) const
 {
   if (vkWaitForFences(headset->getDevice(), 1u, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
   {
-    std::cerr << "Failed to wait for memory fence\n";
-    return false;
+    return;
   }
 
   // Update uniform buffer
@@ -370,21 +345,18 @@ bool Renderer::render(size_t eyeIndex, size_t swapchainImageIndex) const
 
   if (vkResetFences(headset->getDevice(), 1u, &fence) != VK_SUCCESS)
   {
-    std::cerr << "Failed to reset memory fences\n";
-    return false;
+    return;
   }
 
   if (vkResetCommandBuffer(commandBuffer, 0u) != VK_SUCCESS)
   {
-    std::cerr << "Failed to reset command buffer\n";
-    return false;
+    return;
   }
 
   VkCommandBufferBeginInfo commandBufferBeginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   if (vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS)
   {
-    std::cerr << "Failed to begin command buffer recording\n";
-    return false;
+    return;
   }
 
   const VkClearValue clearColor = { { { 0.5f, 0.5f, 0.5f, 1.0f } } };
@@ -432,8 +404,7 @@ bool Renderer::render(size_t eyeIndex, size_t swapchainImageIndex) const
 
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
   {
-    std::cerr << "Failed to end command buffer recording\n";
-    return false;
+    return;
   }
 
   const VkQueue queue = headset->getQueue();
@@ -443,11 +414,8 @@ bool Renderer::render(size_t eyeIndex, size_t swapchainImageIndex) const
   submitInfo.pCommandBuffers = &commandBuffer;
   if (vkQueueSubmit(queue, 1u, &submitInfo, fence) != VK_SUCCESS)
   {
-    std::cerr << "Failed to submit graphics queue\n";
-    return false;
+    return;
   }
-
-  return true;
 }
 
 bool Renderer::isValid() const

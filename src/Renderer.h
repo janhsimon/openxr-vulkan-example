@@ -10,9 +10,9 @@ class Renderer final
 public:
   Renderer(const Headset* headset);
 
-  void destroy();
+  void destroy() const; // Only call when construction succeeded
 
-  bool render(size_t eyeIndex, size_t swapchainImageIndex) const;
+  void render(size_t eyeIndex, size_t swapchainImageIndex) const;
 
   bool isValid() const;
 

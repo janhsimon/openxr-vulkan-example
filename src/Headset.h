@@ -15,10 +15,18 @@ class RenderTarget;
 class Headset final
 {
 public:
+  enum class Error
+  {
+    Success,
+    NoHeadsetDetected,
+    OpenXR,
+    Vulkan
+  };
+
   Headset();
 
   void sync() const;
-  void destroy();
+  void destroy() const; // Only call when construction succeeded
 
   enum class BeginFrameResult
   {
@@ -28,11 +36,11 @@ public:
     EndWithoutRender // Don't render the frame but end it
   };
   BeginFrameResult beginFrame();
-  bool beginEye(size_t eyeIndex, uint32_t& swapchainImageIndex) const;
-  bool endEye(size_t eyeIndex) const;
-  bool endFrame() const;
+  void beginEye(size_t eyeIndex, uint32_t& swapchainImageIndex) const;
+  void endEye(size_t eyeIndex) const;
+  void endFrame() const;
 
-  bool isValid() const;
+  Error getError() const;
   VkInstance getInstance() const;
   VkPhysicalDevice getPhysicalDevice() const;
   VkDevice getDevice() const;
@@ -46,7 +54,7 @@ public:
   glm::mat4 getEyeProjectionMatrix(size_t eyeIndex) const;
 
 private:
-  bool valid = true;
+  Error error = Error::Success;
 
   size_t eyeCount = 0u;
   std::vector<glm::mat4> eyeViewMatrices;

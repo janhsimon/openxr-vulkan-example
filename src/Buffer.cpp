@@ -1,7 +1,5 @@
 #include "Buffer.h"
 
-#include <iostream>
-
 Buffer::Buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags bufferUsageFlags)
 : device(device), size(size)
 {
@@ -11,7 +9,6 @@ Buffer::Buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize si
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   if (vkCreateBuffer(device, &bufferCreateInfo, nullptr, &buffer) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create buffer of " << size << " bytes\n";
     valid = false;
     return;
   }
@@ -39,7 +36,6 @@ Buffer::Buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize si
 
   if (!memoryTypeFound)
   {
-    std::cerr << "Failed to find suitable memory type for buffer\n";
     valid = false;
     return;
   }
@@ -49,14 +45,12 @@ Buffer::Buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize si
   memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
   if (vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &deviceMemory) != VK_SUCCESS)
   {
-    std::cerr << "Failed to allocate " << memoryRequirements.size << " bytes for buffer\n";
     valid = false;
     return;
   }
 
   if (vkBindBufferMemory(device, buffer, deviceMemory, 0u) != VK_SUCCESS)
   {
-    std::cerr << "Failed to bind memory to buffer\n";
     valid = false;
     return;
   }
@@ -79,7 +73,6 @@ void* Buffer::map() const
   void* data;
   if (vkMapMemory(device, deviceMemory, 0u, size, 0, &data) != VK_SUCCESS)
   {
-    std::cerr << "Failed to map memory of buffer\n";
     return nullptr;
   }
 

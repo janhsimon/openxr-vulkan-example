@@ -1,7 +1,5 @@
 #include "RenderTarget.h"
 
-#include <iostream>
-
 RenderTarget::RenderTarget(VkDevice device, VkImage image, VkExtent2D size, VkFormat format, VkRenderPass renderPass)
 : device(device), image(image)
 {
@@ -21,7 +19,6 @@ RenderTarget::RenderTarget(VkDevice device, VkImage image, VkExtent2D size, VkFo
   imageViewCreateInfo.subresourceRange.levelCount = 1u;
   if (vkCreateImageView(device, &imageViewCreateInfo, nullptr, &imageView) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create image view for " << size.width << "x" << size.height << " render target\n";
     valid = false;
     return;
   }
@@ -36,20 +33,13 @@ RenderTarget::RenderTarget(VkDevice device, VkImage image, VkExtent2D size, VkFo
   framebufferCreateInfo.layers = 1u;
   if (vkCreateFramebuffer(device, &framebufferCreateInfo, nullptr, &framebuffer) != VK_SUCCESS)
   {
-    std::cerr << "Failed to create framebuffer for " << size.width << "x" << size.height << " render target\n";
     valid = false;
     return;
   }
 }
 
-void RenderTarget::destroy()
+void RenderTarget::destroy() const
 {
-  if (!valid)
-  {
-    return;
-  }
-  valid = false;
-
   vkDestroyFramebuffer(device, framebuffer, nullptr);
   vkDestroyImageView(device, imageView, nullptr);
 }
