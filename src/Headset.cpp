@@ -2,6 +2,7 @@
 
 #include "RenderTarget.h"
 
+#include <glfw/glfw3.h>
 #include <glm/gtx/quaternion.hpp>
 
 #include <array>
@@ -135,6 +136,19 @@ bool onSessionStateExiting(const XrSession& session, const XrInstance& instance)
 
 Headset::Headset()
 {
+  // Initialize GLFW
+  if (!glfwInit())
+  {
+    error = Error::GLFW;
+    return;
+  }
+
+  if (!glfwVulkanSupported())
+  {
+    error = Error::GLFW;
+    return;
+  }
+
   // Get all supported OpenXR instance extensions
   std::vector<XrExtensionProperties> supportedOpenXRInstanceExtensions;
   {
@@ -356,8 +370,24 @@ Headset::Headset()
     }
   }
 
-  // Get required Vulkan instance extensions from OpenXR
+  // Get required Vulkan instance extensions from GLFW
   std::vector<const char*> vulkanInstanceExtensions;
+  {
+    uint32_t requiredExtensionCount;
+    const char** buffer = glfwGetRequiredInstanceExtensions(&requiredExtensionCount);
+    if (!buffer)
+    {
+      error = Error::GLFW;
+      return;
+    }
+
+    for (uint32_t i = 0u; i < requiredExtensionCount; ++i)
+    {
+      vulkanInstanceExtensions.emplace_back(buffer[i]);
+    }
+  }
+
+  // Get required Vulkan instance extensions from OpenXR and add them
   {
     uint32_t count;
     result = xr.getVulkanInstanceExtensionsKHR(xr.instance, xr.systemId, 0u, &count, nullptr);
@@ -373,11 +403,14 @@ Headset::Headset()
     if (XR_FAILED(result))
     {
       error = Error::OpenXR;
-
       return;
     }
 
-    vulkanInstanceExtensions = extensionStringToVector(buffer);
+    const std::vector<const char*> instanceExtensions = extensionStringToVector(buffer);
+    for (const char* extension : instanceExtensions)
+    {
+      vulkanInstanceExtensions.emplace_back(extension);
+    }
   }
 
 #ifdef DEBUG
@@ -385,7 +418,7 @@ Headset::Headset()
   vulkanInstanceExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
 
-  // Check that all Vulkan instance extensions are supported
+  // Check that all required Vulkan instance extensions are supported
   {
     for (const char* extension : vulkanInstanceExtensions)
     {
@@ -408,7 +441,7 @@ Headset::Headset()
     }
   }
 
-  // Create Vulkan instance with the required extensions from OpenXR
+  // Create Vulkan instance with all required extensions
   {
     VkApplicationInfo applicationInfo{ VK_STRUCTURE_TYPE_APPLICATION_INFO };
     applicationInfo.apiVersion = VK_API_VERSION_1_3;

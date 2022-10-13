@@ -19,6 +19,7 @@ public:
   {
     Success,
     NoHeadsetDetected,
+    GLFW,
     OpenXR,
     Vulkan
   };

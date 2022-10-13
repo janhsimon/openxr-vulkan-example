@@ -21,18 +21,6 @@ void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 
 MirrorView::MirrorView(const Headset* headset) : headset(headset)
 {
-  if (!glfwInit())
-  {
-    error = Error::GLFW;
-    return;
-  }
-
-  if (!glfwVulkanSupported())
-  {
-    error = Error::GLFW;
-    return;
-  }
-
   // Create fullscreen window
   GLFWmonitor* monitor = glfwGetPrimaryMonitor();
 

@@ -19,6 +19,11 @@ int main()
                 boxer::Style::Error);
     return EXIT_FAILURE;
   }
+  else if (headset.getError() == Headset::Error::GLFW)
+  {
+    boxer::show("Headset encountered generic GLFW error.", "Error", boxer::Style::Error);
+    return EXIT_FAILURE;
+  }
   else if (headset.getError() == Headset::Error::OpenXR)
   {
     boxer::show("Headset encountered generic OpenXR error.", "Error", boxer::Style::Error);
