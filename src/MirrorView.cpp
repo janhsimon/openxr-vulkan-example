@@ -7,7 +7,6 @@
 
 namespace
 {
-inline constexpr VkExtent2D windowSize = { 640, 480 };
 inline constexpr const char* windowTitle = "xrvk";
 inline constexpr VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB;
 inline constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
@@ -263,7 +262,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
                                           &destinationImageIndex);
   if (result == VK_ERROR_OUT_OF_DATE_KHR)
   {
-    // Recreate tswapchain and then stop rendering this frame as it is out of date already
+    // Recreate swapchain and then stop rendering this frame as it is out of date already
     recreateSwapchain();
     return;
   }
@@ -326,15 +325,13 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
                        0u, nullptr, 1u, &imageMemoryBarrier);
 
   // Blit source to destination
-  const VkExtent2D mirrorSize = renderSize;
-
   VkImageBlit imageBlit{};
   imageBlit.srcOffsets[1] = { static_cast<int32_t>(resolution.width), static_cast<int32_t>(resolution.height), 1 };
   imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageBlit.srcSubresource.mipLevel = 0u;
   imageBlit.srcSubresource.baseArrayLayer = 0u;
   imageBlit.srcSubresource.layerCount = 1u;
-  imageBlit.dstOffsets[1] = { static_cast<int32_t>(mirrorSize.width), static_cast<int32_t>(mirrorSize.height), 1 };
+  imageBlit.dstOffsets[1] = { static_cast<int32_t>(renderSize.width), static_cast<int32_t>(renderSize.height), 1 };
   imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageBlit.dstSubresource.mipLevel = 0u;
   imageBlit.dstSubresource.baseArrayLayer = 0u;

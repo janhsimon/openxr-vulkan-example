@@ -5,10 +5,10 @@
 #include <glfw/glfw3.h>
 #include <glm/gtx/quaternion.hpp>
 
-#include <array>
 #include <sstream>
 
 #ifdef DEBUG
+  #include <array>
   #include <iostream>
 #endif
 
