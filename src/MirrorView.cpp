@@ -506,7 +506,10 @@ bool MirrorView::recreateSwapchain()
   }
 
   // Clean up before recreating the swapchain and render targets
-  destroySwapchain();
+  if (swapchain)
+  {
+    destroySwapchain();
+  }
 
   // Create new swapchain
   VkSwapchainCreateInfoKHR swapchainCreateInfo{ VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
