@@ -647,6 +647,9 @@ Headset::Headset()
     vulkanDeviceExtensions = extensionStringToVector(buffer);
   }
 
+  // Add required swapchain extension for mirror view
+  vulkanDeviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
   // Check that all Vulkan device extensions are supported
   {
     for (const char* extension : vulkanDeviceExtensions)
