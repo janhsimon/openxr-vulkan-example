@@ -219,7 +219,7 @@ Headset::Headset()
     const XrResult result = xrCreateInstance(&instanceCreateInfo, &xr.instance);
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      error = Error::NoHeadsetDetected;
       return;
     }
   }
