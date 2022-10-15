@@ -909,7 +909,7 @@ Headset::Headset()
       {
         RenderTarget*& renderTarget = swapchainRenderTargets.at(renderTargetIndex);
 
-        VkImage image = swapchainImages.at(renderTargetIndex).image;
+        const VkImage image = swapchainImages.at(renderTargetIndex).image;
         renderTarget = new RenderTarget(vk.device, image, getEyeResolution(eyeIndex), colorFormat, vk.renderPass);
         if (!renderTarget->isValid())
         {
@@ -925,12 +925,11 @@ Headset::Headset()
   for (size_t i = 0u; i < xr.eyeRenderInfos.size(); ++i)
   {
     XrCompositionLayerProjectionView& eyeRenderInfo = xr.eyeRenderInfos.at(i);
-    const XrViewConfigurationView& eyeImageInfo = xr.eyeImageInfos.at(i);
-
     eyeRenderInfo.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
     eyeRenderInfo.next = nullptr;
 
     // Associate this eye with its corresponding swapchain
+    const XrViewConfigurationView& eyeImageInfo = xr.eyeImageInfos.at(i);
     eyeRenderInfo.subImage.swapchain = xr.eyeSwapchains.at(i);
     eyeRenderInfo.subImage.imageArrayIndex = 0u;
     eyeRenderInfo.subImage.imageRect.offset.x = 0;

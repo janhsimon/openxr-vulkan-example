@@ -1,7 +1,6 @@
 #include "MirrorView.h"
 
 #include "Headset.h"
-#include "RenderTarget.h"
 
 #include <glfw/glfw3.h>
 
@@ -118,39 +117,6 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
   vkGetDeviceQueue(device, drawQueueFamilyIndex, 0u, &drawQueue);
   vkGetDeviceQueue(device, presentQueueFamilyIndex, 0u, &presentQueue);
 
-  // Create render pass
-  {
-    VkAttachmentDescription colorAttachmentDescription{};
-    colorAttachmentDescription.format = colorFormat;
-    colorAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference colorAttachmentReference;
-    colorAttachmentReference.attachment = 0u;
-    colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpassDescription{};
-    subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpassDescription.colorAttachmentCount = 1u;
-    subpassDescription.pColorAttachments = &colorAttachmentReference;
-
-    VkRenderPassCreateInfo renderPassCreateInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
-    renderPassCreateInfo.attachmentCount = 1u;
-    renderPassCreateInfo.pAttachments = &colorAttachmentDescription;
-    renderPassCreateInfo.subpassCount = 1u;
-    renderPassCreateInfo.pSubpasses = &subpassDescription;
-    if (vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-  }
-
   // Create swapchain and render targets
   if (!recreateSwapchain())
   {
@@ -210,10 +176,7 @@ void MirrorView::destroy() const
   vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
   vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
   vkDestroyCommandPool(device, commandPool, nullptr);
-
-  destroySwapchain();
-
-  vkDestroyRenderPass(device, renderPass, nullptr);
+  vkDestroySwapchainKHR(headset->getDevice(), swapchain, nullptr);
   vkDestroySurfaceKHR(headset->getInstance(), surface, nullptr);
 
   glfwDestroyWindow(window);
@@ -508,7 +471,7 @@ bool MirrorView::recreateSwapchain()
   // Clean up before recreating the swapchain and render targets
   if (swapchain)
   {
-    destroySwapchain();
+    vkDestroySwapchainKHR(headset->getDevice(), swapchain, nullptr);
   }
 
   // Create new swapchain
@@ -531,7 +494,6 @@ bool MirrorView::recreateSwapchain()
   }
 
   // Retrieve new swapchain images
-  std::vector<VkImage> swapchainImages;
   uint32_t swapchainImageCount = 0u;
   if (vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr) != VK_SUCCESS)
   {
@@ -544,30 +506,5 @@ bool MirrorView::recreateSwapchain()
     return false;
   }
 
-  // Create new swapchain render targets
-  swapchainRenderTargets.resize(swapchainImages.size());
-  for (size_t i = 0u; i < swapchainRenderTargets.size(); ++i)
-  {
-    RenderTarget*& renderTarget = swapchainRenderTargets.at(i);
-
-    VkImage image = swapchainImages.at(i);
-    renderTarget = new RenderTarget(device, image, surfaceCapabilities.currentExtent, surfaceFormat.format, renderPass);
-    if (!renderTarget->isValid())
-    {
-      return false;
-    }
-  }
-
   return true;
-}
-
-void MirrorView::destroySwapchain() const
-{
-  for (RenderTarget* renderTarget : swapchainRenderTargets)
-  {
-    renderTarget->destroy();
-    delete renderTarget;
-  }
-
-  vkDestroySwapchainKHR(headset->getDevice(), swapchain, nullptr);
 }

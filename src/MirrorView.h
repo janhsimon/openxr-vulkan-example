@@ -6,7 +6,6 @@
 
 struct GLFWwindow;
 class Headset;
-class RenderTarget;
 
 class MirrorView final
 {
@@ -38,9 +37,8 @@ private:
   VkSurfaceKHR surface = nullptr;
   uint32_t drawQueueFamilyIndex = 0u, presentQueueFamilyIndex = 0u;
   VkQueue drawQueue = nullptr, presentQueue = nullptr;
-  VkRenderPass renderPass = nullptr;
   VkSwapchainKHR swapchain = nullptr;
-  std::vector<RenderTarget*> swapchainRenderTargets;
+  std::vector<VkImage> swapchainImages;
   VkCommandPool commandPool = nullptr;
   VkCommandBuffer commandBuffer = nullptr;
   VkSemaphore imageAvailableSemaphore = nullptr, renderFinishedSemaphore = nullptr;
@@ -49,5 +47,4 @@ private:
   bool resizeDetected = false;
 
   bool recreateSwapchain();
-  void destroySwapchain() const;
 };
