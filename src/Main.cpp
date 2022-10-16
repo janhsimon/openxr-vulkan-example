@@ -59,7 +59,6 @@ int main()
   {
     mirrorView.processWindowEvents();
 
-    uint32_t mirrorSwapchainImageIndex = 0u;
     Headset::BeginFrameResult result = headset.beginFrame();
     if (result == Headset::BeginFrameResult::Error)
     {
@@ -76,21 +75,19 @@ int main()
         uint32_t swapchainImageIndex;
         headset.beginEye(eyeIndex, swapchainImageIndex);
 
+        renderer.render(eyeIndex, swapchainImageIndex);
+
         if (eyeIndex == mirrorEyeIndex)
         {
-          mirrorSwapchainImageIndex = swapchainImageIndex;
+          const VkImage mirrorImage = headset.getEyeRenderTarget(mirrorEyeIndex, swapchainImageIndex)->getImage();
+          mirrorView.render(mirrorImage, headset.getEyeResolution(mirrorEyeIndex));
         }
-
-        renderer.render(eyeIndex, swapchainImageIndex);
 
         headset.endEye(eyeIndex);
       }
     }
 
     headset.endFrame();
-
-    const VkImage mirrorImage = headset.getEyeRenderTarget(mirrorEyeIndex, mirrorSwapchainImageIndex)->getImage();
-    mirrorView.render(mirrorImage, headset.getEyeResolution(mirrorEyeIndex));
   }
 
   headset.sync(); // Sync before destroying so that resources are free

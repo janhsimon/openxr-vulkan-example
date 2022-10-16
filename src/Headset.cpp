@@ -726,7 +726,7 @@ Headset::Headset()
     colorAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference colorAttachmentReference;

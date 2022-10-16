@@ -252,7 +252,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
     return;
   }
 
-  VkImage destinationImage = swapchainRenderTargets.at(destinationImageIndex)->getImage();
+  const VkImage destinationImage = swapchainImages.at(destinationImageIndex);
 
   // Convert source image layout from undefined to transfer source
   VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
@@ -261,8 +261,6 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
   imageMemoryBarrier.srcAccessMask = 0u;
   imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-  imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
   imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
@@ -277,8 +275,6 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
   imageMemoryBarrier.srcAccessMask = 0u;
   imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
   imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
@@ -302,30 +298,12 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   vkCmdBlitImage(commandBuffer, sourceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destinationImage,
                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, VK_FILTER_NEAREST);
 
-  // Convert destination image layout from transfer destination to present
-  imageMemoryBarrier.image = destinationImage;
-  imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  imageMemoryBarrier.dstAccessMask = 0u;
-  imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
-  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
-  imageMemoryBarrier.subresourceRange.layerCount = 1u;
-  imageMemoryBarrier.subresourceRange.levelCount = 1u;
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
-                       0u, nullptr, 1u, &imageMemoryBarrier);
-
   // Convert source image layout from transfer source to color attachment
   imageMemoryBarrier.image = sourceImage;
   imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
   imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
   imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
   imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
@@ -333,6 +311,20 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   imageMemoryBarrier.subresourceRange.levelCount = 1u;
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0u,
                        0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
+
+  // Convert destination image layout from transfer destination to present
+  imageMemoryBarrier.image = destinationImage;
+  imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  imageMemoryBarrier.dstAccessMask = 0u;
+  imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
+  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
+  imageMemoryBarrier.subresourceRange.layerCount = 1u;
+  imageMemoryBarrier.subresourceRange.levelCount = 1u;
+  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
+                       0u, nullptr, 1u, &imageMemoryBarrier);
 
   // End recording command buffer
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
