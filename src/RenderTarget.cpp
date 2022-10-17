@@ -1,21 +1,26 @@
 #include "RenderTarget.h"
 
-RenderTarget::RenderTarget(VkDevice device, VkImage image, VkExtent2D size, VkFormat format, VkRenderPass renderPass)
+RenderTarget::RenderTarget(VkDevice device,
+                           VkImage image,
+                           VkExtent2D size,
+                           VkFormat format,
+                           VkRenderPass renderPass,
+                           uint32_t layerCount)
 : device(device), image(image)
 {
   // Create image view
   VkImageViewCreateInfo imageViewCreateInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
   imageViewCreateInfo.image = image;
   imageViewCreateInfo.format = format;
-  imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  imageViewCreateInfo.viewType = (layerCount == 1u ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY);
   imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
   imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
   imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
   imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+  imageViewCreateInfo.subresourceRange.layerCount = layerCount;
   imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageViewCreateInfo.subresourceRange.baseArrayLayer = 0u;
   imageViewCreateInfo.subresourceRange.baseMipLevel = 0u;
-  imageViewCreateInfo.subresourceRange.layerCount = 1u;
   imageViewCreateInfo.subresourceRange.levelCount = 1u;
   if (vkCreateImageView(device, &imageViewCreateInfo, nullptr, &imageView) != VK_SUCCESS)
   {

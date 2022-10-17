@@ -25,9 +25,9 @@ constexpr std::array vertices = {
 
 struct UniformBufferObject final
 {
-  glm::mat4 world;
-  glm::mat4 view;
-  glm::mat4 projection;
+  glm::mat4 world[2];
+  glm::mat4 view[2];
+  glm::mat4 projection[2];
 } ubo;
 
 bool loadShaderFromFile(VkDevice device, const std::string& filename, VkShaderModule& shaderModule)
@@ -327,7 +327,7 @@ void Renderer::destroy() const
   delete uniformBuffer;
 }
 
-void Renderer::render(size_t eyeIndex, size_t swapchainImageIndex) const
+void Renderer::render(size_t swapchainImageIndex) const
 {
   if (vkWaitForFences(headset->getDevice(), 1u, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
   {
@@ -335,9 +335,12 @@ void Renderer::render(size_t eyeIndex, size_t swapchainImageIndex) const
   }
 
   // Update uniform buffer
-  ubo.world = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, 0.0f });
-  ubo.view = headset->getEyeViewMatrix(eyeIndex);
-  ubo.projection = headset->getEyeProjectionMatrix(eyeIndex);
+  for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
+  {
+    ubo.world[eyeIndex] = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, 0.0f });
+    ubo.view[eyeIndex] = headset->getEyeViewMatrix(eyeIndex);
+    ubo.projection[eyeIndex] = headset->getEyeProjectionMatrix(eyeIndex);
+  }
 
   void* data = uniformBuffer->map();
   memcpy(data, &ubo, sizeof(ubo));
@@ -363,9 +366,9 @@ void Renderer::render(size_t eyeIndex, size_t swapchainImageIndex) const
 
   VkRenderPassBeginInfo renderPassBeginInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
   renderPassBeginInfo.renderPass = headset->getRenderPass();
-  renderPassBeginInfo.framebuffer = headset->getEyeRenderTarget(eyeIndex, swapchainImageIndex)->getFramebuffer();
+  renderPassBeginInfo.framebuffer = headset->getRenderTarget(swapchainImageIndex)->getFramebuffer();
   renderPassBeginInfo.renderArea.offset = { 0, 0 };
-  renderPassBeginInfo.renderArea.extent = headset->getEyeResolution(eyeIndex);
+  renderPassBeginInfo.renderArea.extent = headset->getEyeResolution(0u);
   renderPassBeginInfo.clearValueCount = 1u;
   renderPassBeginInfo.pClearValues = &clearColor;
 

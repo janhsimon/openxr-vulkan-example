@@ -31,14 +31,12 @@ public:
 
   enum class BeginFrameResult
   {
-    Error,           // An error occurred
-    RenderFully,     // Render this frame normally
-    SkipImmediately, // Skip processing this frame entirely without ending it
-    EndWithoutRender // Don't render the frame but end it
+    Error,       // An error occurred
+    RenderFully, // Render this frame normally
+    SkipFully,   // Skip processing this frame entirely without ending it
+    SkipButEnd   // Don't render the frame but end it
   };
-  BeginFrameResult beginFrame();
-  void beginEye(size_t eyeIndex, uint32_t& swapchainImageIndex) const;
-  void endEye(size_t eyeIndex) const;
+  BeginFrameResult beginFrame(uint32_t& swapchainImageIndex);
   void endFrame() const;
 
   Error getError() const;
@@ -50,9 +48,9 @@ public:
   VkQueue getQueue() const;
   size_t getEyeCount() const;
   VkExtent2D getEyeResolution(size_t eyeIndex) const;
-  RenderTarget* getEyeRenderTarget(size_t eyeIndex, size_t swapchainImageIndex) const;
   glm::mat4 getEyeViewMatrix(size_t eyeIndex) const;
   glm::mat4 getEyeProjectionMatrix(size_t eyeIndex) const;
+  RenderTarget* getRenderTarget(size_t swapchainImageIndex) const;
 
 private:
   Error error = Error::Success;
@@ -81,8 +79,8 @@ private:
     std::vector<XrViewConfigurationView> eyeImageInfos;
     std::vector<XrView> eyePoses;
     std::vector<XrCompositionLayerProjectionView> eyeRenderInfos;
-    std::vector<XrSwapchain> eyeSwapchains;
-    std::vector<std::vector<RenderTarget*>> eyeSwapchainRenderTargets;
+    XrSwapchain swapchain = nullptr;
+    std::vector<RenderTarget*> swapchainRenderTargets;
 
 #ifdef DEBUG
     PFN_xrCreateDebugUtilsMessengerEXT createDebugUtilsMessengerEXT = nullptr;

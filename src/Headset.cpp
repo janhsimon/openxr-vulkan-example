@@ -681,17 +681,29 @@ Headset::Headset()
     deviceQueueCreateInfo.queueCount = 1u;
     deviceQueueCreateInfo.pQueuePriorities = &queuePriority;
 
-    VkPhysicalDeviceFeatures physicalDeviceFeatures{};
-    physicalDeviceFeatures.shaderStorageImageMultisample = VK_TRUE; // Required for OpenXR (to avoid a validation error)
-
     // Verify that required physical device features are supported
-    VkPhysicalDeviceFeatures features;
-    vkGetPhysicalDeviceFeatures(vk.physicalDevice, &features);
-    if (!features.shaderStorageImageMultisample)
+    VkPhysicalDeviceFeatures physicalDeviceFeatures;
+    vkGetPhysicalDeviceFeatures(vk.physicalDevice, &physicalDeviceFeatures);
+    if (!physicalDeviceFeatures.shaderStorageImageMultisample)
     {
       error = Error::Vulkan;
       return;
     }
+
+    VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    VkPhysicalDeviceMultiviewFeatures physicalDeviceMultiviewFeatures{
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES
+    };
+    physicalDeviceFeatures2.pNext = &physicalDeviceMultiviewFeatures;
+    vkGetPhysicalDeviceFeatures2(vk.physicalDevice, &physicalDeviceFeatures2);
+    if (!physicalDeviceMultiviewFeatures.multiview)
+    {
+      error = Error::Vulkan;
+      return;
+    }
+
+    physicalDeviceFeatures.shaderStorageImageMultisample = VK_TRUE; // For OpenXR to avoid a validation error
+    physicalDeviceMultiviewFeatures.multiview = VK_TRUE;            // For stereo rendering
 
     VkDeviceCreateInfo deviceCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(vulkanDeviceExtensions.size());
@@ -699,6 +711,7 @@ Headset::Headset()
     deviceCreateInfo.queueCreateInfoCount = 1u;
     deviceCreateInfo.pQueueCreateInfos = &deviceQueueCreateInfo;
     deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
+    deviceCreateInfo.pNext = &physicalDeviceMultiviewFeatures;
     if (vkCreateDevice(vk.physicalDevice, &deviceCreateInfo, nullptr, &vk.device) != VK_SUCCESS)
     {
       error = Error::Vulkan;
@@ -719,6 +732,17 @@ Headset::Headset()
 
   // Create render pass
   {
+    constexpr uint32_t viewMask = 0b00000011;
+    constexpr uint32_t correlationMask = 0b00000011;
+
+    VkRenderPassMultiviewCreateInfo renderPassMultiviewCreateInfo{
+      VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO
+    };
+    renderPassMultiviewCreateInfo.subpassCount = 1u;
+    renderPassMultiviewCreateInfo.pViewMasks = &viewMask;
+    renderPassMultiviewCreateInfo.correlationMaskCount = 1u;
+    renderPassMultiviewCreateInfo.pCorrelationMasks = &correlationMask;
+
     VkAttachmentDescription colorAttachmentDescription{};
     colorAttachmentDescription.format = colorFormat;
     colorAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -739,6 +763,7 @@ Headset::Headset()
     subpassDescription.pColorAttachments = &colorAttachmentReference;
 
     VkRenderPassCreateInfo renderPassCreateInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+    renderPassCreateInfo.pNext = &renderPassMultiviewCreateInfo;
     renderPassCreateInfo.attachmentCount = 1u;
     renderPassCreateInfo.pAttachments = &colorAttachmentDescription;
     renderPassCreateInfo.subpassCount = 1u;
@@ -850,92 +875,83 @@ Headset::Headset()
 
   // Create swapchain and render targets
   {
-    xr.eyeSwapchains.resize(eyeCount);
-    xr.eyeSwapchainRenderTargets.resize(eyeCount);
+    const XrViewConfigurationView& eyeImageInfo = xr.eyeImageInfos.at(0u);
 
-    for (size_t eyeIndex = 0u; eyeIndex < xr.eyeSwapchains.size(); ++eyeIndex)
+    // Create swapchain
+    XrSwapchainCreateInfo swapchainCreateInfo{ XR_TYPE_SWAPCHAIN_CREATE_INFO };
+    swapchainCreateInfo.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchainCreateInfo.format = colorFormat;
+    swapchainCreateInfo.sampleCount = eyeImageInfo.recommendedSwapchainSampleCount;
+    swapchainCreateInfo.width = eyeImageInfo.recommendedImageRectWidth;
+    swapchainCreateInfo.height = eyeImageInfo.recommendedImageRectHeight;
+    swapchainCreateInfo.arraySize = static_cast<uint32_t>(eyeCount);
+    swapchainCreateInfo.faceCount = 1u;
+    swapchainCreateInfo.mipCount = 1u;
+
+    result = xrCreateSwapchain(xr.session, &swapchainCreateInfo, &xr.swapchain);
+    if (XR_FAILED(result))
     {
-      XrSwapchain& swapchain = xr.eyeSwapchains.at(eyeIndex);
-      const XrViewConfigurationView& eyeImageInfo = xr.eyeImageInfos.at(eyeIndex);
+      error = Error::OpenXR;
+      return;
+    }
 
-      // Create swapchain
-      XrSwapchainCreateInfo swapchainCreateInfo{ XR_TYPE_SWAPCHAIN_CREATE_INFO };
-      swapchainCreateInfo.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
-      swapchainCreateInfo.format = colorFormat;
-      swapchainCreateInfo.sampleCount = eyeImageInfo.recommendedSwapchainSampleCount;
-      swapchainCreateInfo.width = eyeImageInfo.recommendedImageRectWidth;
-      swapchainCreateInfo.height = eyeImageInfo.recommendedImageRectHeight;
-      swapchainCreateInfo.faceCount = 1u;
-      swapchainCreateInfo.arraySize = 1u;
-      swapchainCreateInfo.mipCount = 1u;
+    // Get number of swapchain images
+    uint32_t swapchainImageCount;
+    result = xrEnumerateSwapchainImages(xr.swapchain, 0u, &swapchainImageCount, nullptr);
+    if (XR_FAILED(result))
+    {
+      error = Error::OpenXR;
+      return;
+    }
 
-      result = xrCreateSwapchain(xr.session, &swapchainCreateInfo, &swapchain);
-      if (XR_FAILED(result))
+    // Retrieve swapchain images
+    std::vector<XrSwapchainImageVulkanKHR> swapchainImages;
+    swapchainImages.resize(swapchainImageCount);
+    for (XrSwapchainImageVulkanKHR& swapchainImage : swapchainImages)
+    {
+      swapchainImage.type = XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR;
+    }
+
+    XrSwapchainImageBaseHeader* data = reinterpret_cast<XrSwapchainImageBaseHeader*>(swapchainImages.data());
+    result = xrEnumerateSwapchainImages(xr.swapchain, static_cast<uint32_t>(swapchainImages.size()),
+                                        &swapchainImageCount, data);
+    if (XR_FAILED(result))
+    {
+      error = Error::OpenXR;
+      return;
+    }
+
+    // Create render target
+    xr.swapchainRenderTargets.resize(swapchainImages.size());
+    for (size_t renderTargetIndex = 0u; renderTargetIndex < xr.swapchainRenderTargets.size(); ++renderTargetIndex)
+    {
+      RenderTarget*& renderTarget = xr.swapchainRenderTargets.at(renderTargetIndex);
+
+      const VkImage image = swapchainImages.at(renderTargetIndex).image;
+      renderTarget = new RenderTarget(vk.device, image, getEyeResolution(0u), colorFormat, vk.renderPass, 2u);
+      if (!renderTarget->isValid())
       {
-        error = Error::OpenXR;
+        error = Error::Vulkan;
         return;
-      }
-
-      // Get number of swapchain images
-      uint32_t swapchainImageCount;
-      result = xrEnumerateSwapchainImages(swapchain, 0, &swapchainImageCount, nullptr);
-      if (XR_FAILED(result))
-      {
-        error = Error::OpenXR;
-        return;
-      }
-
-      // Retrieve swapchain images
-      std::vector<XrSwapchainImageVulkanKHR> swapchainImages;
-      swapchainImages.resize(swapchainImageCount);
-      for (XrSwapchainImageVulkanKHR& swapchainImage : swapchainImages)
-      {
-        swapchainImage.type = XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR;
-      }
-
-      XrSwapchainImageBaseHeader* data = reinterpret_cast<XrSwapchainImageBaseHeader*>(swapchainImages.data());
-      result = xrEnumerateSwapchainImages(swapchain, static_cast<uint32_t>(swapchainImages.size()),
-                                          &swapchainImageCount, data);
-      if (XR_FAILED(result))
-      {
-        error = Error::OpenXR;
-        return;
-      }
-
-      // Create render target
-      std::vector<RenderTarget*>& swapchainRenderTargets = xr.eyeSwapchainRenderTargets.at(eyeIndex);
-      swapchainRenderTargets.resize(swapchainImages.size());
-      for (size_t renderTargetIndex = 0u; renderTargetIndex < swapchainRenderTargets.size(); ++renderTargetIndex)
-      {
-        RenderTarget*& renderTarget = swapchainRenderTargets.at(renderTargetIndex);
-
-        const VkImage image = swapchainImages.at(renderTargetIndex).image;
-        renderTarget = new RenderTarget(vk.device, image, getEyeResolution(eyeIndex), colorFormat, vk.renderPass);
-        if (!renderTarget->isValid())
-        {
-          error = Error::Vulkan;
-          return;
-        }
       }
     }
   }
 
   // Create eye render info
   xr.eyeRenderInfos.resize(eyeCount);
-  for (size_t i = 0u; i < xr.eyeRenderInfos.size(); ++i)
+  for (size_t eyeIndex = 0u; eyeIndex < xr.eyeRenderInfos.size(); ++eyeIndex)
   {
-    XrCompositionLayerProjectionView& eyeRenderInfo = xr.eyeRenderInfos.at(i);
+    XrCompositionLayerProjectionView& eyeRenderInfo = xr.eyeRenderInfos.at(eyeIndex);
     eyeRenderInfo.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
     eyeRenderInfo.next = nullptr;
 
-    // Associate this eye with its corresponding swapchain
-    const XrViewConfigurationView& eyeImageInfo = xr.eyeImageInfos.at(i);
-    eyeRenderInfo.subImage.swapchain = xr.eyeSwapchains.at(i);
-    eyeRenderInfo.subImage.imageArrayIndex = 0u;
-    eyeRenderInfo.subImage.imageRect.offset.x = 0;
-    eyeRenderInfo.subImage.imageRect.offset.y = 0;
-    eyeRenderInfo.subImage.imageRect.extent.width = eyeImageInfo.recommendedImageRectWidth;
-    eyeRenderInfo.subImage.imageRect.extent.height = eyeImageInfo.recommendedImageRectHeight;
+    // Associate this eye with the swapchain
+    const XrViewConfigurationView& eyeImageInfo = xr.eyeImageInfos.at(eyeIndex);
+    eyeRenderInfo.subImage.swapchain = xr.swapchain;
+    eyeRenderInfo.subImage.imageArrayIndex = static_cast<uint32_t>(eyeIndex);
+    eyeRenderInfo.subImage.imageRect.offset = { 0, 0 };
+    eyeRenderInfo.subImage.imageRect.extent = { static_cast<int32_t>(eyeImageInfo.recommendedImageRectWidth),
+                                                static_cast<int32_t>(eyeImageInfo.recommendedImageRectHeight) };
   }
 
   // Allocate view and projection matrices
@@ -952,20 +968,12 @@ void Headset::destroy() const
 {
   // Clean up OpenXR
   xrEndSession(xr.session);
+  xrDestroySwapchain(xr.swapchain);
 
-  for (const XrSwapchain eyeSwapchain : xr.eyeSwapchains)
+  for (const RenderTarget* renderTarget : xr.swapchainRenderTargets)
   {
-    xrDestroySwapchain(eyeSwapchain);
-  }
-
-  for (const std::vector<RenderTarget*>& renderTargets : xr.eyeSwapchainRenderTargets)
-  {
-    for (RenderTarget* renderTarget : renderTargets)
-    {
-      renderTarget->destroy();
-      delete renderTarget;
-      renderTarget = nullptr;
-    }
+    renderTarget->destroy();
+    delete renderTarget;
   }
 
   xrDestroySpace(xr.space);
@@ -988,7 +996,7 @@ void Headset::destroy() const
   vkDestroyInstance(vk.instance, nullptr);
 }
 
-Headset::BeginFrameResult Headset::beginFrame()
+Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 {
   // Poll OpenXR events
   XrEventDataBuffer buffer;
@@ -1037,7 +1045,7 @@ Headset::BeginFrameResult Headset::beginFrame()
   {
     // If we are not ready, synchronized, visible or focused, we skip all processing of this frame
     // This means no waiting, no beginning or ending of the frame at all
-    return BeginFrameResult::SkipImmediately;
+    return BeginFrameResult::SkipFully;
   }
 
   // Wait for new frame
@@ -1061,7 +1069,7 @@ Headset::BeginFrameResult Headset::beginFrame()
   {
     // Let the host know that we don't want to render this frame
     // We do still need to end the frame however
-    return BeginFrameResult::EndWithoutRender;
+    return BeginFrameResult::SkipButEnd;
   }
 
   // Update eye poses
@@ -1100,46 +1108,36 @@ Headset::BeginFrameResult Headset::beginFrame()
     eyeProjectionMatrices.at(eyeIndex) = createProjectionMatrix(eyeRenderInfo.fov, 0.1f, 250.0f);
   }
 
-  return BeginFrameResult::RenderFully; // Request full rendering of the frame
-}
-
-void Headset::beginEye(size_t eyeIndex, uint32_t& swapchainImageIndex) const
-{
-  const XrSwapchain& swapchain = xr.eyeSwapchains.at(eyeIndex);
-
   // Acquire swapchain image
   XrSwapchainImageAcquireInfo swapchainImageAcquireInfo{ XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
-  XrResult result = xrAcquireSwapchainImage(swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
+  result = xrAcquireSwapchainImage(xr.swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
   if (XR_FAILED(result))
   {
-    return;
+    return BeginFrameResult::Error;
   }
 
   // Wait for swapchain image
   XrSwapchainImageWaitInfo swapchainImageWaitInfo{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
   swapchainImageWaitInfo.timeout = XR_INFINITE_DURATION;
-  result = xrWaitSwapchainImage(swapchain, &swapchainImageWaitInfo);
+  result = xrWaitSwapchainImage(xr.swapchain, &swapchainImageWaitInfo);
   if (XR_FAILED(result))
   {
-    return;
+    return BeginFrameResult::Error;
   }
-}
 
-void Headset::endEye(size_t eyeIndex) const
-{
-  const XrSwapchain& swapchain = xr.eyeSwapchains.at(eyeIndex);
-
-  // Release swapchain image
-  XrSwapchainImageReleaseInfo swapchainImageReleaseInfo{ XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
-  const XrResult result = xrReleaseSwapchainImage(swapchain, &swapchainImageReleaseInfo);
-  if (XR_FAILED(result))
-  {
-    return;
-  }
+  return BeginFrameResult::RenderFully; // Request full rendering of the frame
 }
 
 void Headset::endFrame() const
 {
+  // Release swapchain image
+  XrSwapchainImageReleaseInfo swapchainImageReleaseInfo{ XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
+  XrResult result = xrReleaseSwapchainImage(xr.swapchain, &swapchainImageReleaseInfo);
+  if (XR_FAILED(result))
+  {
+    return;
+  }
+
   // End frame
   XrCompositionLayerProjection compositionLayerProjection{ XR_TYPE_COMPOSITION_LAYER_PROJECTION };
   compositionLayerProjection.space = xr.space;
@@ -1162,7 +1160,7 @@ void Headset::endFrame() const
   frameEndInfo.layerCount = submittedLayerCount;
   frameEndInfo.layers = (submittedLayerCount == 0u ? nullptr : submittedLayers);
   frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-  const XrResult result = xrEndFrame(xr.session, &frameEndInfo);
+  result = xrEndFrame(xr.session, &frameEndInfo);
   if (XR_FAILED(result))
   {
     return;
@@ -1215,11 +1213,6 @@ VkExtent2D Headset::getEyeResolution(size_t eyeIndex) const
   return { eyeInfo.recommendedImageRectWidth, eyeInfo.recommendedImageRectHeight };
 }
 
-RenderTarget* Headset::getEyeRenderTarget(size_t eyeIndex, size_t swapchainImageIndex) const
-{
-  return xr.eyeSwapchainRenderTargets.at(eyeIndex).at(swapchainImageIndex);
-}
-
 glm::mat4 Headset::getEyeViewMatrix(size_t eyeIndex) const
 {
   return eyeViewMatrices.at(eyeIndex);
@@ -1228,4 +1221,9 @@ glm::mat4 Headset::getEyeViewMatrix(size_t eyeIndex) const
 glm::mat4 Headset::getEyeProjectionMatrix(size_t eyeIndex) const
 {
   return eyeProjectionMatrices.at(eyeIndex);
+}
+
+RenderTarget* Headset::getRenderTarget(size_t swapchainImageIndex) const
+{
+  return xr.swapchainRenderTargets.at(swapchainImageIndex);
 }

@@ -59,41 +59,29 @@ int main()
   {
     mirrorView.processWindowEvents();
 
-    Headset::BeginFrameResult result = headset.beginFrame();
+    uint32_t imageIndex;
+    Headset::BeginFrameResult result = headset.beginFrame(imageIndex);
     if (result == Headset::BeginFrameResult::Error)
     {
       return EXIT_FAILURE;
     }
-    else if (result == Headset::BeginFrameResult::SkipImmediately)
-    {
-      continue;
-    }
     else if (result == Headset::BeginFrameResult::RenderFully)
     {
-      for (size_t eyeIndex = 0u; eyeIndex < headset.getEyeCount(); ++eyeIndex)
-      {
-        uint32_t swapchainImageIndex;
-        headset.beginEye(eyeIndex, swapchainImageIndex);
+      renderer.render(imageIndex);
 
-        renderer.render(eyeIndex, swapchainImageIndex);
-
-        if (eyeIndex == mirrorEyeIndex)
-        {
-          const VkImage mirrorImage = headset.getEyeRenderTarget(mirrorEyeIndex, swapchainImageIndex)->getImage();
-          mirrorView.render(mirrorImage, headset.getEyeResolution(mirrorEyeIndex));
-        }
-
-        headset.endEye(eyeIndex);
-      }
+      const VkImage mirrorImage = headset.getRenderTarget(imageIndex)->getImage();
+      mirrorView.render(mirrorImage, headset.getEyeResolution(mirrorEyeIndex));
     }
 
-    headset.endFrame();
+    if (result == Headset::BeginFrameResult::RenderFully || result == Headset::BeginFrameResult::SkipButEnd)
+    {
+      headset.endFrame();
+    }
   }
 
   headset.sync(); // Sync before destroying so that resources are free
   mirrorView.destroy();
   renderer.destroy();
   headset.destroy();
-
   return EXIT_SUCCESS;
 }

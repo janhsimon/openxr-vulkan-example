@@ -5,7 +5,12 @@
 class RenderTarget final
 {
 public:
-  RenderTarget(VkDevice device, VkImage image, VkExtent2D size, VkFormat format, VkRenderPass renderPass);
+  RenderTarget(VkDevice device,
+               VkImage image,
+               VkExtent2D size,
+               VkFormat format,
+               VkRenderPass renderPass,
+               uint32_t layerCount);
 
   void destroy() const; // Only call when construction succeeded
 
