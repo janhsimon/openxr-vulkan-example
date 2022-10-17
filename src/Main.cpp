@@ -5,11 +5,6 @@
 
 #include <boxer/boxer.h>
 
-namespace
-{
-inline constexpr size_t mirrorEyeIndex = 1u; // Index of eye to mirror, 0 = left, 1 = right
-}
-
 int main()
 {
   Headset headset;
@@ -70,7 +65,7 @@ int main()
       renderer.render(imageIndex);
 
       const VkImage mirrorImage = headset.getRenderTarget(imageIndex)->getImage();
-      mirrorView.render(mirrorImage, headset.getEyeResolution(mirrorEyeIndex));
+      mirrorView.render(mirrorImage, headset.getEyeResolution(0u));
     }
 
     if (result == Headset::BeginFrameResult::RenderFully || result == Headset::BeginFrameResult::SkipButEnd)

@@ -9,6 +9,7 @@ namespace
 inline constexpr const char* windowTitle = "xrvk";
 inline constexpr VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB;
 inline constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+inline constexpr size_t mirrorEyeIndex = 1u; // Index of eye to mirror, 0 = left, 1 = right
 
 void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
@@ -262,10 +263,10 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   imageMemoryBarrier.srcAccessMask = 0u;
   imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
   imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
-  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
   imageMemoryBarrier.subresourceRange.layerCount = 1u;
+  imageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
   imageMemoryBarrier.subresourceRange.levelCount = 1u;
+  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
                        0u, nullptr, 1u, &imageMemoryBarrier);
 
@@ -276,10 +277,10 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   imageMemoryBarrier.srcAccessMask = 0u;
   imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
   imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
-  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
   imageMemoryBarrier.subresourceRange.layerCount = 1u;
+  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
   imageMemoryBarrier.subresourceRange.levelCount = 1u;
+  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
                        0u, nullptr, 1u, &imageMemoryBarrier);
 
@@ -288,15 +289,15 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   imageBlit.srcOffsets[1] = { static_cast<int32_t>(resolution.width), static_cast<int32_t>(resolution.height), 1 };
   imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageBlit.srcSubresource.mipLevel = 0u;
-  imageBlit.srcSubresource.baseArrayLayer = 0u;
+  imageBlit.srcSubresource.baseArrayLayer = mirrorEyeIndex;
   imageBlit.srcSubresource.layerCount = 1u;
   imageBlit.dstOffsets[1] = { static_cast<int32_t>(renderSize.width), static_cast<int32_t>(renderSize.height), 1 };
   imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageBlit.dstSubresource.mipLevel = 0u;
-  imageBlit.dstSubresource.baseArrayLayer = 0u;
   imageBlit.dstSubresource.layerCount = 1u;
+  imageBlit.dstSubresource.baseArrayLayer = 0u;
+  imageBlit.dstSubresource.mipLevel = 0u;
   vkCmdBlitImage(commandBuffer, sourceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destinationImage,
-                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, VK_FILTER_NEAREST);
+                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &imageBlit, VK_FILTER_NEAREST);
 
   // Convert source image layout from transfer source to color attachment
   imageMemoryBarrier.image = sourceImage;
@@ -305,10 +306,10 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
   imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
   imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
-  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
   imageMemoryBarrier.subresourceRange.layerCount = 1u;
+  imageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
   imageMemoryBarrier.subresourceRange.levelCount = 1u;
+  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0u,
                        0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
 
@@ -319,10 +320,10 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
   imageMemoryBarrier.dstAccessMask = 0u;
   imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
-  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
   imageMemoryBarrier.subresourceRange.layerCount = 1u;
+  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
   imageMemoryBarrier.subresourceRange.levelCount = 1u;
+  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
                        0u, nullptr, 1u, &imageMemoryBarrier);
 
