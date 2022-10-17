@@ -879,7 +879,6 @@ Headset::Headset()
 
     // Create swapchain
     XrSwapchainCreateInfo swapchainCreateInfo{ XR_TYPE_SWAPCHAIN_CREATE_INFO };
-    swapchainCreateInfo.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
     swapchainCreateInfo.format = colorFormat;
     swapchainCreateInfo.sampleCount = eyeImageInfo.recommendedSwapchainSampleCount;
     swapchainCreateInfo.width = eyeImageInfo.recommendedImageRectWidth;
