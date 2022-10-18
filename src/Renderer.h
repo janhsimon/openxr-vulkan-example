@@ -29,5 +29,5 @@ private:
   VkCommandBuffer commandBuffer = nullptr;
   VkFence fence = nullptr;
 
-  Buffer *uniformBuffer = nullptr, *vertexBuffer = nullptr;
+  Buffer *uniformBuffer = nullptr, *vertexBuffer = nullptr, *indexBuffer = nullptr;
 };

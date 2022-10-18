@@ -76,14 +76,8 @@ Buffer::Buffer(VkDevice device,
   }
 }
 
-void Buffer::destroy()
+void Buffer::destroy() const
 {
-  if (!valid)
-  {
-    return;
-  }
-  valid = false;
-
   vkFreeMemory(device, deviceMemory, nullptr);
   vkDestroyBuffer(device, buffer, nullptr);
 }

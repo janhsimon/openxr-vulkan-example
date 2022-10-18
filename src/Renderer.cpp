@@ -17,11 +17,12 @@ struct Vertex final
   glm::vec3 color;
 };
 
-constexpr std::array vertices = {
-  Vertex({ -20.0f, 0.0f, -20.0f }, { 1.0f, 0.0f, 0.0f }), Vertex({ +20.0f, 0.0f, -20.0f }, { 0.0f, 1.0f, 0.0f }),
-  Vertex({ -20.0f, 0.0f, +20.0f }, { 0.0f, 0.0f, 1.0f }), Vertex({ -20.0f, 0.0f, +20.0f }, { 0.0f, 0.0f, 1.0f }),
-  Vertex({ +20.0f, 0.0f, -20.0f }, { 0.0f, 1.0f, 0.0f }), Vertex({ +20.0f, 0.0f, +20.0f }, { 1.0f, 0.0f, 1.0f })
-};
+constexpr std::array vertices = { Vertex({ -20.0f, 0.0f, -20.0f }, { 1.0f, 0.0f, 0.0f }),
+                                  Vertex({ -20.0f, 0.0f, +20.0f }, { 0.0f, 1.0f, 0.0f }),
+                                  Vertex({ +20.0f, 0.0f, -20.0f }, { 0.0f, 0.0f, 1.0f }),
+                                  Vertex({ +20.0f, 0.0f, +20.0f }, { 1.0f, 0.0f, 1.0f }) };
+
+constexpr std::array<uint16_t, 6u> indices = { 0u, 1u, 2u, 1u, 2u, 3u };
 
 struct UniformBufferObject final
 {
@@ -283,37 +284,75 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Create a staging buffer and fill it with the vertex data
-  constexpr size_t size = sizeof(Vertex) * vertices.size();
-  Buffer* stagingBuffer = new Buffer(device, headset->getPhysicalDevice(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                     static_cast<VkDeviceSize>(size), static_cast<const void*>(vertices.data()));
-  if (!stagingBuffer->isValid())
+  // Create a vertex buffer
   {
-    valid = false;
-    return;
+    // Create a staging buffer and fill it with the vertex data
+    constexpr size_t size = sizeof(vertices);
+    Buffer* stagingBuffer = new Buffer(device, headset->getPhysicalDevice(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                       static_cast<VkDeviceSize>(size), static_cast<const void*>(vertices.data()));
+    if (!stagingBuffer->isValid())
+    {
+      valid = false;
+      return;
+    }
+
+    // Create an empty target buffer
+    vertexBuffer = new Buffer(device, headset->getPhysicalDevice(),
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
+    if (!vertexBuffer->isValid())
+    {
+      valid = false;
+      return;
+    }
+
+    // Copy from the staging to the target buffer
+    if (!stagingBuffer->copyTo(*vertexBuffer, commandBuffer, headset->getQueue()))
+    {
+      valid = false;
+      return;
+    }
+
+    // Clean up the staging buffer
+    stagingBuffer->destroy();
+    delete stagingBuffer;
   }
 
-  // Create an empty vertex buffer
-  vertexBuffer = new Buffer(device, headset->getPhysicalDevice(),
-                            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
-  if (!vertexBuffer->isValid())
+  // Create an index buffer
   {
-    valid = false;
-    return;
-  }
+    // Create a staging buffer and fill it with the index data
+    constexpr size_t size = sizeof(indices);
+    Buffer* stagingBuffer = new Buffer(device, headset->getPhysicalDevice(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                       static_cast<VkDeviceSize>(size), static_cast<const void*>(indices.data()));
+    if (!stagingBuffer->isValid())
+    {
+      valid = false;
+      return;
+    }
 
-  // Copy from the staging to the vertex buffer
-  if (!stagingBuffer->copyTo(*vertexBuffer, commandBuffer, headset->getQueue()))
-  {
-    valid = false;
-    return;
-  }
+    // Create an empty target buffer
+    indexBuffer = new Buffer(device, headset->getPhysicalDevice(),
+                             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
+    if (!indexBuffer->isValid())
+    {
+      valid = false;
+      return;
+    }
 
-  // Clean up the staging buffer
-  stagingBuffer->destroy();
-  delete stagingBuffer;
+    // Copy from the staging to the target buffer
+    if (!stagingBuffer->copyTo(*indexBuffer, commandBuffer, headset->getQueue()))
+    {
+      valid = false;
+      return;
+    }
+
+    // Clean up the staging buffer
+    stagingBuffer->destroy();
+    delete stagingBuffer;
+  }
 
   // Create a memory fence
   VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
@@ -329,6 +368,9 @@ void Renderer::destroy() const
 {
   const VkDevice device = headset->getDevice();
   vkDestroyFence(device, fence, nullptr);
+
+  indexBuffer->destroy();
+  delete indexBuffer;
 
   vertexBuffer->destroy();
   delete vertexBuffer;
@@ -418,11 +460,14 @@ void Renderer::render(size_t swapchainImageIndex) const
   const VkBuffer buffer = vertexBuffer->getBuffer();
   vkCmdBindVertexBuffers(commandBuffer, 0u, 1u, &buffer, &offset);
 
+  // Bind the index buffer
+  vkCmdBindIndexBuffer(commandBuffer, indexBuffer->getBuffer(), 0u, VK_INDEX_TYPE_UINT16);
+
   // Bind the uniform buffer
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0u, 1u, &descriptorSet, 0u,
                           nullptr);
 
-  vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1u, 0u, 0u);
+  vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1u, 0u, 0u, 0u);
 
   vkCmdEndRenderPass(commandBuffer);
 
