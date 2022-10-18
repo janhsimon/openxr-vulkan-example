@@ -68,7 +68,7 @@ int main()
       mirrorView.render(mirrorImage, headset.getEyeResolution(0u));
     }
 
-    if (result == Headset::BeginFrameResult::RenderFully || result == Headset::BeginFrameResult::SkipButEnd)
+    if (result == Headset::BeginFrameResult::RenderFully || result == Headset::BeginFrameResult::SkipRender)
     {
       headset.endFrame();
     }

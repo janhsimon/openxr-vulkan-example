@@ -25,7 +25,7 @@ constexpr std::array vertices = {
 
 struct UniformBufferObject final
 {
-  glm::mat4 world[2];
+  glm::mat4 world;
   glm::mat4 view[2];
   glm::mat4 projection[2];
 } ubo;
@@ -50,7 +50,6 @@ bool loadShaderFromFile(VkDevice device, const std::string& filename, VkShaderMo
   shaderModuleCreateInfo.flags = 0u;
   shaderModuleCreateInfo.codeSize = code.size();
   shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
   if (vkCreateShaderModule(device, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS)
   {
     return false;
@@ -64,12 +63,12 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
 {
   const VkDevice device = headset->getDevice();
 
-  // Create uniform buffer
+  // Create a uniform buffer
   uniformBuffer =
     new Buffer(device, headset->getPhysicalDevice(), static_cast<VkDeviceSize>(sizeof(UniformBufferObject)),
                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
-  // Create descriptor set layout
+  // Create a descriptor set layout
   VkDescriptorSetLayoutBinding descriptorSetLayoutBinding{};
   descriptorSetLayoutBinding.binding = 0u;
   descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -85,7 +84,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Create descriptor pool
+  // Create a descriptor pool
   VkDescriptorPoolSize descriptorPoolSize;
   descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   descriptorPoolSize.descriptorCount = 1u;
@@ -100,7 +99,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Allocate descriptor set
+  // Allocate a descriptor set
   VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
   descriptorSetAllocateInfo.descriptorPool = descriptorPool;
   descriptorSetAllocateInfo.descriptorSetCount = 1u;
@@ -125,7 +124,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   writeDescriptorSet.dstArrayElement = 0u;
   vkUpdateDescriptorSets(device, 1u, &writeDescriptorSet, 0u, nullptr);
 
-  // Create pipeline layout
+  // Create a pipeline layout
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
   pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
   pipelineLayoutCreateInfo.setLayoutCount = 1u;
@@ -135,7 +134,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Create pipeline
+  // Create a pipeline
   VkShaderModule vertexShaderModule;
   if (!loadShaderFromFile(device, "shaders/basic.vert.spv", vertexShaderModule))
   {
@@ -263,7 +262,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   vkDestroyShaderModule(device, vertexShaderModule, nullptr);
   vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
 
-  // Create vertex buffer
+  // Create a vertex buffer
   constexpr size_t size = sizeof(Vertex) * vertices.size();
   vertexBuffer = new Buffer(device, headset->getPhysicalDevice(), static_cast<VkDeviceSize>(size),
                             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -273,12 +272,12 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Fill vertex buffer
+  // Fill a vertex buffer
   void* data = vertexBuffer->map();
   memcpy(data, vertices.data(), size);
   vertexBuffer->unmap();
 
-  // Create command pool
+  // Create a command pool
   VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
   commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   commandPoolCreateInfo.queueFamilyIndex = headset->getQueueFamilyIndex();
@@ -288,7 +287,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Allocate command buffer
+  // Allocate a command buffer
   VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
   commandBufferAllocateInfo.commandPool = commandPool;
   commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -299,7 +298,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Create memory fence
+  // Create a memory fence
   VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
   if (vkCreateFence(device, &fenceCreateInfo, nullptr, &fence) != VK_SUCCESS)
@@ -334,10 +333,10 @@ void Renderer::render(size_t swapchainImageIndex) const
     return;
   }
 
-  // Update uniform buffer
+  // Update the uniform buffer
+  ubo.world = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, 0.0f });
   for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
   {
-    ubo.world[eyeIndex] = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, 0.0f });
     ubo.view[eyeIndex] = headset->getEyeViewMatrix(eyeIndex);
     ubo.projection[eyeIndex] = headset->getEyeProjectionMatrix(eyeIndex);
   }
@@ -376,7 +375,7 @@ void Renderer::render(size_t swapchainImageIndex) const
 
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-  // Set viewport
+  // Set the viewport
   VkViewport viewport;
   viewport.x = static_cast<float>(renderPassBeginInfo.renderArea.offset.x);
   viewport.y = static_cast<float>(renderPassBeginInfo.renderArea.offset.y);
@@ -386,18 +385,18 @@ void Renderer::render(size_t swapchainImageIndex) const
   viewport.maxDepth = 1.0f;
   vkCmdSetViewport(commandBuffer, 0u, 1u, &viewport);
 
-  // Set scissor
+  // Set the scissor
   VkRect2D scissor;
   scissor.offset = renderPassBeginInfo.renderArea.offset;
   scissor.extent = renderPassBeginInfo.renderArea.extent;
   vkCmdSetScissor(commandBuffer, 0u, 1u, &scissor);
 
-  // Bind vertex buffer
+  // Bind the vertex buffer
   const VkDeviceSize offset = 0u;
   const VkBuffer buffer = vertexBuffer->getBuffer();
   vkCmdBindVertexBuffers(commandBuffer, 0u, 1u, &buffer, &offset);
 
-  // Bind uniform buffer
+  // Bind the uniform buffer
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0u, 1u, &descriptorSet, 0u,
                           nullptr);
 

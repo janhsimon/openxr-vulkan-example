@@ -33,8 +33,8 @@ public:
   {
     Error,       // An error occurred
     RenderFully, // Render this frame normally
-    SkipFully,   // Skip processing this frame entirely without ending it
-    SkipButEnd   // Don't render the frame but end it
+    SkipRender,  // Skip rendering the frame but end it
+    SkipFully    // Skip processing this frame entirely without ending it
   };
   BeginFrameResult beginFrame(uint32_t& swapchainImageIndex);
   void endFrame() const;

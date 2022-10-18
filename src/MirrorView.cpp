@@ -9,7 +9,7 @@ namespace
 inline constexpr const char* windowTitle = "xrvk";
 inline constexpr VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB;
 inline constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-inline constexpr size_t mirrorEyeIndex = 1u; // Index of eye to mirror, 0 = left, 1 = right
+inline constexpr size_t mirrorEyeIndex = 1u; // Eye index to mirror, 0 = left, 1 = right
 
 void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
@@ -20,14 +20,14 @@ void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 
 MirrorView::MirrorView(const Headset* headset) : headset(headset)
 {
-  // Create fullscreen window
+  // Create a fullscreen window
   GLFWmonitor* monitor = glfwGetPrimaryMonitor();
 
   int x, y, width, height;
   glfwGetMonitorWorkarea(monitor, &x, &y, &width, &height);
 
 #ifdef DEBUG
-  // Create quarter-sized window in debug mode instead
+  // Create a quarter-sized window in debug mode instead
   width /= 2;
   height /= 2;
   monitor = nullptr;
@@ -44,7 +44,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
   glfwSetWindowUserPointer(window, this);
   glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
-  // Create surface for the window
+  // Create a surface for the window
   VkResult result = glfwCreateWindowSurface(headset->getInstance(), window, nullptr, &surface);
   if (result != VK_SUCCESS)
   {
@@ -54,9 +54,9 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
 
   VkPhysicalDevice physicalDevice = headset->getPhysicalDevice();
 
-  // Pick queue family indices for the physical device
+  // Pick the queue family indices for the physical device
   {
-    // Retrieve queue families
+    // Retrieve the queue families
     std::vector<VkQueueFamilyProperties> queueFamilies;
     uint32_t queueFamilyCount = 0u;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
@@ -64,7 +64,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
     queueFamilies.resize(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
-    // Pick queue family indices
+    // Pick the queue family indices
     bool drawQueueFamilyIndexFound = false;
     bool presentQueueFamilyIndexFound = false;
     for (size_t queueFamilyIndexCandidate = 0u; queueFamilyIndexCandidate < queueFamilies.size();
@@ -72,20 +72,20 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
     {
       const VkQueueFamilyProperties& queueFamilyCandidate = queueFamilies.at(queueFamilyIndexCandidate);
 
-      // Check that queue family includes actual queues
+      // Check that the queue family includes actual queues
       if (queueFamilyCandidate.queueCount == 0u)
       {
         continue;
       }
 
-      // Check queue family for drawing support
+      // Check the queue family for drawing support
       if (!drawQueueFamilyIndexFound && queueFamilyCandidate.queueFlags & VK_QUEUE_GRAPHICS_BIT)
       {
         drawQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
         drawQueueFamilyIndexFound = true;
       }
 
-      // Check queue family for presenting support
+      // Check the queue family for presenting support
       VkBool32 presentSupport = false;
       if (vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, static_cast<uint32_t>(queueFamilyIndexCandidate),
                                                surface, &presentSupport) != VK_SUCCESS)
@@ -118,14 +118,14 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
   vkGetDeviceQueue(device, drawQueueFamilyIndex, 0u, &drawQueue);
   vkGetDeviceQueue(device, presentQueueFamilyIndex, 0u, &presentQueue);
 
-  // Create swapchain and render targets
+  // Create a swapchain and render targets
   if (!recreateSwapchain())
   {
     error = Error::Vulkan;
     return;
   }
 
-  // Create command pool
+  // Create a command pool
   VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
   commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   commandPoolCreateInfo.queueFamilyIndex = drawQueueFamilyIndex;
@@ -135,7 +135,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Allocate command buffer
+  // Allocate a command buffer
   VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
   commandBufferAllocateInfo.commandPool = commandPool;
   commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -146,7 +146,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Create semaphores
+  // Create the semaphores
   VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
   if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS)
   {
@@ -160,7 +160,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Create memory fence
+  // Create a memory fence
   VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
   if (vkCreateFence(device, &fenceCreateInfo, nullptr, &inFlightFence) != VK_SUCCESS)
@@ -226,7 +226,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
                                           &destinationImageIndex);
   if (result == VK_ERROR_OUT_OF_DATE_KHR)
   {
-    // Recreate swapchain and then stop rendering this frame as it is out of date already
+    // Recreate the swapchain and then stop rendering this frame as it is out of date already
     recreateSwapchain();
     return;
   }
@@ -241,7 +241,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
     return;
   }
 
-  // Reset and begin recording command buffer
+  // Reset and begin recording the command buffer
   if (vkResetCommandBuffer(commandBuffer, 0u) != VK_SUCCESS)
   {
     return;
@@ -255,7 +255,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
 
   const VkImage destinationImage = swapchainImages.at(destinationImageIndex);
 
-  // Convert source image layout from undefined to transfer source
+  // Convert the source image layout from undefined to transfer source
   VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
   imageMemoryBarrier.image = sourceImage;
   imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -270,7 +270,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
                        0u, nullptr, 1u, &imageMemoryBarrier);
 
-  // Convert destination image layout from undefined to transfer destination
+  // Convert the destination image layout from undefined to transfer destination
   imageMemoryBarrier.image = destinationImage;
   imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -284,7 +284,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
                        0u, nullptr, 1u, &imageMemoryBarrier);
 
-  // Blit source to destination
+  // Blit the source to the destination image
   VkImageBlit imageBlit{};
   imageBlit.srcOffsets[1] = { static_cast<int32_t>(resolution.width), static_cast<int32_t>(resolution.height), 1 };
   imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -299,7 +299,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   vkCmdBlitImage(commandBuffer, sourceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destinationImage,
                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &imageBlit, VK_FILTER_NEAREST);
 
-  // Convert source image layout from transfer source to color attachment
+  // Convert the source image layout from transfer source to color attachment
   imageMemoryBarrier.image = sourceImage;
   imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
   imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -313,7 +313,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0u,
                        0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
 
-  // Convert destination image layout from transfer destination to present
+  // Convert the destination image layout from transfer destination to present
   imageMemoryBarrier.image = destinationImage;
   imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
   imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -327,7 +327,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
                        0u, nullptr, 1u, &imageMemoryBarrier);
 
-  // End recording command buffer
+  // End recording the command buffer
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
   {
     return;
@@ -360,7 +360,7 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
   result = vkQueuePresentKHR(presentQueue, &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
   {
-    // Recreate swapchain for the next frame if necessary
+    // Recreate the swapchain for the next frame if necessary
     if (!recreateSwapchain())
     {
       return;
@@ -389,7 +389,7 @@ bool MirrorView::recreateSwapchain()
 
   const VkPhysicalDevice physicalDevice = headset->getPhysicalDevice();
 
-  // Get surface capabilities and extent
+  // Get the surface capabilities and extent
   VkSurfaceCapabilitiesKHR surfaceCapabilities;
   {
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities) != VK_SUCCESS)
@@ -427,7 +427,7 @@ bool MirrorView::recreateSwapchain()
     }
   }
 
-  // Get surface formats and pick one with the desired color format support
+  // Get the surface formats and pick one with the desired color format support
   VkSurfaceFormatKHR surfaceFormat;
   {
     uint32_t surfaceFormatCount = 0u;
@@ -443,7 +443,7 @@ bool MirrorView::recreateSwapchain()
       return false;
     }
 
-    // Find surface format to use
+    // Find the surface format to use
     bool surfaceFormatFound = false;
     for (const VkSurfaceFormatKHR& surfaceFormatCandidate : surfaceFormats)
     {
@@ -467,7 +467,7 @@ bool MirrorView::recreateSwapchain()
     vkDestroySwapchainKHR(headset->getDevice(), swapchain, nullptr);
   }
 
-  // Create new swapchain
+  // Create a new swapchain
   VkSwapchainCreateInfoKHR swapchainCreateInfo{ VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
   swapchainCreateInfo.surface = surface;
   swapchainCreateInfo.presentMode = presentMode;
@@ -486,7 +486,7 @@ bool MirrorView::recreateSwapchain()
     return false;
   }
 
-  // Retrieve new swapchain images
+  // Retrieve the new swapchain images
   uint32_t swapchainImageCount = 0u;
   if (vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr) != VK_SUCCESS)
   {

@@ -8,7 +8,7 @@ RenderTarget::RenderTarget(VkDevice device,
                            uint32_t layerCount)
 : device(device), image(image)
 {
-  // Create image view
+  // Create an image view
   VkImageViewCreateInfo imageViewCreateInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
   imageViewCreateInfo.image = image;
   imageViewCreateInfo.format = format;
@@ -28,7 +28,7 @@ RenderTarget::RenderTarget(VkDevice device,
     return;
   }
 
-  // Create framebuffer
+  // Create a framebuffer
   VkFramebufferCreateInfo framebufferCreateInfo{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
   framebufferCreateInfo.renderPass = renderPass;
   framebufferCreateInfo.attachmentCount = 1u;

@@ -90,7 +90,7 @@ glm::mat4 createProjectionMatrix(XrFovf fov, float nearClip, float farClip)
 
 bool onSessionStateReady(const XrSession& session)
 {
-  // Start session
+  // Start the session
   XrSessionBeginInfo sessionBeginInfo{ XR_TYPE_SESSION_BEGIN_INFO };
   sessionBeginInfo.primaryViewConfigurationType = viewType;
   const XrResult result = xrBeginSession(session, &sessionBeginInfo);
@@ -104,7 +104,7 @@ bool onSessionStateReady(const XrSession& session)
 
 bool onSessionStateStopping(const XrSession& session)
 {
-  // End session
+  // End the session
   const XrResult result = xrEndSession(session);
   if (XR_FAILED(result))
   {
@@ -116,14 +116,14 @@ bool onSessionStateStopping(const XrSession& session)
 
 bool onSessionStateExiting(const XrSession& session, const XrInstance& instance)
 {
-  // Destroy session
+  // Destroy the session
   XrResult result = xrDestroySession(session);
   if (XR_FAILED(result))
   {
     return false;
   }
 
-  // Destroy instance
+  // Destroy the instance
   result = xrDestroyInstance(instance);
   if (XR_FAILED(result))
   {
@@ -176,7 +176,7 @@ Headset::Headset()
     }
   }
 
-  // Create OpenXR instance
+  // Create an OpenXR instance
   {
     XrApplicationInfo applicationInfo;
     applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
@@ -188,7 +188,7 @@ Headset::Headset()
     std::vector<const char*> extensions = { XR_KHR_VULKAN_ENABLE_EXTENSION_NAME };
 
 #ifdef DEBUG
-    // Add OpenXR debug instance extension
+    // Add the OpenXR debug instance extension
     extensions.emplace_back(XR_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
 
@@ -224,7 +224,7 @@ Headset::Headset()
     }
   }
 
-  // Load required OpenXR extension functions
+  // Load the required OpenXR extension functions
   if (!loadXrExtensionFunction(xr.instance, "xrGetVulkanInstanceExtensionsKHR",
                                reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanInstanceExtensionsKHR)))
   {
@@ -254,7 +254,7 @@ Headset::Headset()
   }
 
 #ifdef DEBUG
-  // Create OpenXR debug utils messenger for validation
+  // Create an OpenXR debug utils messenger for validation
   {
     if (!loadXrExtensionFunction(xr.instance, "xrCreateDebugUtilsMessengerEXT",
                                  reinterpret_cast<PFN_xrVoidFunction*>(&xr.createDebugUtilsMessengerEXT)))
@@ -304,7 +304,7 @@ Headset::Headset()
   }
 #endif
 
-  // Get system ID
+  // Get the system ID
   XrSystemGetInfo systemGetInfo{ XR_TYPE_SYSTEM_GET_INFO };
   systemGetInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
   XrResult result = xrGetSystem(xr.instance, &systemGetInfo, &xr.systemId);
@@ -314,7 +314,7 @@ Headset::Headset()
     return;
   }
 
-  // Check supported environment blend modes
+  // Check the supported environment blend modes
   {
     uint32_t environmentBlendModeCount;
     result =
@@ -370,7 +370,7 @@ Headset::Headset()
     }
   }
 
-  // Get required Vulkan instance extensions from GLFW
+  // Get the required Vulkan instance extensions from GLFW
   std::vector<const char*> vulkanInstanceExtensions;
   {
     uint32_t requiredExtensionCount;
@@ -387,7 +387,7 @@ Headset::Headset()
     }
   }
 
-  // Get required Vulkan instance extensions from OpenXR and add them
+  // Get the required Vulkan instance extensions from OpenXR and add them
   {
     uint32_t count;
     result = xr.getVulkanInstanceExtensionsKHR(xr.instance, xr.systemId, 0u, &count, nullptr);
@@ -414,34 +414,32 @@ Headset::Headset()
   }
 
 #ifdef DEBUG
-  // Add Vulkan debug instance extension
+  // Add the Vulkan debug instance extension
   vulkanInstanceExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
 
   // Check that all required Vulkan instance extensions are supported
+  for (const char* extension : vulkanInstanceExtensions)
   {
-    for (const char* extension : vulkanInstanceExtensions)
+    bool extensionSupported = false;
+
+    for (const VkExtensionProperties& supportedExtension : supportedVulkanInstanceExtensions)
     {
-      bool extensionSupported = false;
-
-      for (const VkExtensionProperties& supportedExtension : supportedVulkanInstanceExtensions)
+      if (strcmp(extension, supportedExtension.extensionName) == 0)
       {
-        if (strcmp(extension, supportedExtension.extensionName) == 0)
-        {
-          extensionSupported = true;
-          break;
-        }
+        extensionSupported = true;
+        break;
       }
+    }
 
-      if (!extensionSupported)
-      {
-        error = Error::Vulkan;
-        return;
-      }
+    if (!extensionSupported)
+    {
+      error = Error::Vulkan;
+      return;
     }
   }
 
-  // Create Vulkan instance with all required extensions
+  // Create a Vulkan instance with all required extensions
   {
     VkApplicationInfo applicationInfo{ VK_STRUCTURE_TYPE_APPLICATION_INFO };
     applicationInfo.apiVersion = VK_API_VERSION_1_3;
@@ -506,7 +504,7 @@ Headset::Headset()
   }
 
 #ifdef DEBUG
-  // Create Vulkan debug utils messenger for validation
+  // Create a Vulkan debug utils messenger for validation
   {
     vk.createDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
       loadVkExtensionFunction(vk.instance, "vkCreateDebugUtilsMessengerEXT"));
@@ -559,7 +557,7 @@ Headset::Headset()
   }
 #endif
 
-  // Retrieve physical device from OpenXR
+  // Retrieve the physical device from OpenXR
   result = xr.getVulkanGraphicsDeviceKHR(xr.instance, xr.systemId, vk.instance, &vk.physicalDevice);
   if (XR_FAILED(result))
   {
@@ -567,9 +565,9 @@ Headset::Headset()
     return;
   }
 
-  // Pick draw queue family index
+  // Pick a draw queue family index
   {
-    // Retrieve queue families
+    // Retrieve the queue families
     std::vector<VkQueueFamilyProperties> queueFamilies;
     uint32_t queueFamilyCount;
     vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, nullptr);
@@ -583,13 +581,13 @@ Headset::Headset()
     {
       const VkQueueFamilyProperties& queueFamilyCandidate = queueFamilies.at(queueFamilyIndexCandidate);
 
-      // Check that queue family includes actual queues
+      // Check that the queue family includes actual queues
       if (queueFamilyCandidate.queueCount == 0u)
       {
         continue;
       }
 
-      // Check queue family for drawing support
+      // Check the queue family for drawing support
       if (queueFamilyCandidate.queueFlags & VK_QUEUE_GRAPHICS_BIT)
       {
         vk.queueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
@@ -624,7 +622,7 @@ Headset::Headset()
     }
   }
 
-  // Get required Vulkan device extensions from OpenXR
+  // Get the required Vulkan device extensions from OpenXR
   std::vector<const char*> vulkanDeviceExtensions;
   {
     uint32_t count;
@@ -647,7 +645,7 @@ Headset::Headset()
     vulkanDeviceExtensions = extensionStringToVector(buffer);
   }
 
-  // Add required swapchain extension for mirror view
+  // Add the required swapchain extension for mirror view
   vulkanDeviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
   // Check that all Vulkan device extensions are supported
@@ -672,7 +670,7 @@ Headset::Headset()
     }
   }
 
-  // Create device
+  // Create a device
   {
     constexpr float queuePriority = 1.0f;
 
@@ -681,7 +679,7 @@ Headset::Headset()
     deviceQueueCreateInfo.queueCount = 1u;
     deviceQueueCreateInfo.pQueuePriorities = &queuePriority;
 
-    // Verify that required physical device features are supported
+    // Verify that the required physical device features are supported
     VkPhysicalDeviceFeatures physicalDeviceFeatures;
     vkGetPhysicalDeviceFeatures(vk.physicalDevice, &physicalDeviceFeatures);
     if (!physicalDeviceFeatures.shaderStorageImageMultisample)
@@ -702,8 +700,8 @@ Headset::Headset()
       return;
     }
 
-    physicalDeviceFeatures.shaderStorageImageMultisample = VK_TRUE; // For OpenXR to avoid a validation error
-    physicalDeviceMultiviewFeatures.multiview = VK_TRUE;            // For stereo rendering
+    physicalDeviceFeatures.shaderStorageImageMultisample = VK_TRUE; // Needed for some OpenXR implementations
+    physicalDeviceMultiviewFeatures.multiview = VK_TRUE;            // Needed for stereo rendering
 
     VkDeviceCreateInfo deviceCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(vulkanDeviceExtensions.size());
@@ -719,7 +717,7 @@ Headset::Headset()
     }
   }
 
-  // Check graphics requirements for Vulkan
+  // Check the graphics requirements for Vulkan
   XrGraphicsRequirementsVulkanKHR graphicsRequirements{ XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR };
   result = xr.getVulkanGraphicsRequirementsKHR(xr.instance, xr.systemId, &graphicsRequirements);
   if (XR_FAILED(result))
@@ -730,7 +728,7 @@ Headset::Headset()
 
   vkGetDeviceQueue(vk.device, vk.queueFamilyIndex, 0u, &vk.queue);
 
-  // Create render pass
+  // Create a render pass
   {
     constexpr uint32_t viewMask = 0b00000011;
     constexpr uint32_t correlationMask = 0b00000011;
@@ -775,7 +773,7 @@ Headset::Headset()
     }
   }
 
-  // Create session with Vulkan graphics binding
+  // Create a session with Vulkan graphics binding
   XrGraphicsBindingVulkanKHR graphicsBinding{ XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR };
   graphicsBinding.device = vk.device;
   graphicsBinding.instance = vk.instance;
@@ -793,7 +791,7 @@ Headset::Headset()
     return;
   }
 
-  // Create play space
+  // Create a play space
   XrReferenceSpaceCreateInfo referenceSpaceCreateInfo{ XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
   referenceSpaceCreateInfo.referenceSpaceType = spaceType;
   referenceSpaceCreateInfo.poseInReferenceSpace = makeIdentity();
@@ -804,7 +802,7 @@ Headset::Headset()
     return;
   }
 
-  // Get number of eyes
+  // Get the number of eyes
   result = xrEnumerateViewConfigurationViews(xr.instance, xr.systemId, viewType, 0u,
                                              reinterpret_cast<uint32_t*>(&eyeCount), nullptr);
   if (XR_FAILED(result))
@@ -813,7 +811,7 @@ Headset::Headset()
     return;
   }
 
-  // Get eye image info per eye
+  // Get the eye image info per eye
   xr.eyeImageInfos.resize(eyeCount);
   for (XrViewConfigurationView& eyeInfo : xr.eyeImageInfos)
   {
@@ -830,7 +828,7 @@ Headset::Headset()
     return;
   }
 
-  // Allocate eye poses
+  // Allocate the eye poses
   xr.eyePoses.resize(eyeCount);
   for (XrView& eyePose : xr.eyePoses)
   {
@@ -838,7 +836,7 @@ Headset::Headset()
     eyePose.next = nullptr;
   }
 
-  // Verify that desired color format is supported
+  // Verify that the desired color format is supported
   {
     uint32_t formatCount = 0u;
     result = xrEnumerateSwapchainFormats(xr.session, 0u, &formatCount, nullptr);
@@ -873,11 +871,11 @@ Headset::Headset()
     }
   }
 
-  // Create swapchain and render targets
+  // Create a swapchain and render targets
   {
     const XrViewConfigurationView& eyeImageInfo = xr.eyeImageInfos.at(0u);
 
-    // Create swapchain
+    // Create a swapchain
     XrSwapchainCreateInfo swapchainCreateInfo{ XR_TYPE_SWAPCHAIN_CREATE_INFO };
     swapchainCreateInfo.format = colorFormat;
     swapchainCreateInfo.sampleCount = eyeImageInfo.recommendedSwapchainSampleCount;
@@ -894,7 +892,7 @@ Headset::Headset()
       return;
     }
 
-    // Get number of swapchain images
+    // Get the number of swapchain images
     uint32_t swapchainImageCount;
     result = xrEnumerateSwapchainImages(xr.swapchain, 0u, &swapchainImageCount, nullptr);
     if (XR_FAILED(result))
@@ -903,7 +901,7 @@ Headset::Headset()
       return;
     }
 
-    // Retrieve swapchain images
+    // Retrieve the swapchain images
     std::vector<XrSwapchainImageVulkanKHR> swapchainImages;
     swapchainImages.resize(swapchainImageCount);
     for (XrSwapchainImageVulkanKHR& swapchainImage : swapchainImages)
@@ -920,7 +918,7 @@ Headset::Headset()
       return;
     }
 
-    // Create render target
+    // Create the render targets
     xr.swapchainRenderTargets.resize(swapchainImages.size());
     for (size_t renderTargetIndex = 0u; renderTargetIndex < xr.swapchainRenderTargets.size(); ++renderTargetIndex)
     {
@@ -936,7 +934,7 @@ Headset::Headset()
     }
   }
 
-  // Create eye render info
+  // Create the eye render infos
   xr.eyeRenderInfos.resize(eyeCount);
   for (size_t eyeIndex = 0u; eyeIndex < xr.eyeRenderInfos.size(); ++eyeIndex)
   {
@@ -1047,7 +1045,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     return BeginFrameResult::SkipFully;
   }
 
-  // Wait for new frame
+  // Wait for the new frame
   xr.frameState.type = XR_TYPE_FRAME_STATE;
   XrFrameWaitInfo frameWaitInfo{ XR_TYPE_FRAME_WAIT_INFO };
   XrResult result = xrWaitFrame(xr.session, &frameWaitInfo, &xr.frameState);
@@ -1056,7 +1054,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     return BeginFrameResult::Error;
   }
 
-  // Begin new frame
+  // Begin the new frame
   XrFrameBeginInfo frameBeginInfo{ XR_TYPE_FRAME_BEGIN_INFO };
   result = xrBeginFrame(xr.session, &frameBeginInfo);
   if (XR_FAILED(result))
@@ -1068,10 +1066,10 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   {
     // Let the host know that we don't want to render this frame
     // We do still need to end the frame however
-    return BeginFrameResult::SkipButEnd;
+    return BeginFrameResult::SkipRender;
   }
 
-  // Update eye poses
+  // Update the eye poses
   xr.viewState.type = XR_TYPE_VIEW_STATE;
   uint32_t viewCount;
   XrViewLocateInfo viewLocateInfo{ XR_TYPE_VIEW_LOCATE_INFO };
@@ -1090,24 +1088,22 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     return BeginFrameResult::Error;
   }
 
-  // Update eye render info, view and projection matrices
+  // Update the eye render infos, view and projection matrices
   for (size_t eyeIndex = 0u; eyeIndex < eyeCount; ++eyeIndex)
   {
-    // Copy eye pose into eye render info
+    // Copy the eye poses into the eye render infos
     XrCompositionLayerProjectionView& eyeRenderInfo = xr.eyeRenderInfos.at(eyeIndex);
     const XrView& eyePose = xr.eyePoses.at(eyeIndex);
     eyeRenderInfo.pose = eyePose.pose;
     eyeRenderInfo.fov = eyePose.fov;
 
-    // Update view matrix
+    // Update the view and projection matrices
     const XrPosef& pose = eyeRenderInfo.pose;
     eyeViewMatrices.at(eyeIndex) = poseToMatrix(pose);
-
-    // Update projection matrix
     eyeProjectionMatrices.at(eyeIndex) = createProjectionMatrix(eyeRenderInfo.fov, 0.1f, 250.0f);
   }
 
-  // Acquire swapchain image
+  // Acquire the swapchain image
   XrSwapchainImageAcquireInfo swapchainImageAcquireInfo{ XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
   result = xrAcquireSwapchainImage(xr.swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
   if (XR_FAILED(result))
@@ -1115,7 +1111,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     return BeginFrameResult::Error;
   }
 
-  // Wait for swapchain image
+  // Wait for the swapchain image
   XrSwapchainImageWaitInfo swapchainImageWaitInfo{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
   swapchainImageWaitInfo.timeout = XR_INFINITE_DURATION;
   result = xrWaitSwapchainImage(xr.swapchain, &swapchainImageWaitInfo);
@@ -1129,7 +1125,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
 void Headset::endFrame() const
 {
-  // Release swapchain image
+  // Release the swapchain image
   XrSwapchainImageReleaseInfo swapchainImageReleaseInfo{ XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
   XrResult result = xrReleaseSwapchainImage(xr.swapchain, &swapchainImageReleaseInfo);
   if (XR_FAILED(result))
@@ -1137,7 +1133,7 @@ void Headset::endFrame() const
     return;
   }
 
-  // End frame
+  // End the frame
   XrCompositionLayerProjection compositionLayerProjection{ XR_TYPE_COMPOSITION_LAYER_PROJECTION };
   compositionLayerProjection.space = xr.space;
   compositionLayerProjection.viewCount = static_cast<uint32_t>(xr.eyeRenderInfos.size());
