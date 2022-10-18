@@ -63,10 +63,10 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
 {
   const VkDevice device = headset->getDevice();
 
-  // Create a uniform buffer
-  uniformBuffer =
-    new Buffer(device, headset->getPhysicalDevice(), static_cast<VkDeviceSize>(sizeof(UniformBufferObject)),
-               VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+  // Create an empty uniform buffer
+  uniformBuffer = new Buffer(device, headset->getPhysicalDevice(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                             static_cast<VkDeviceSize>(sizeof(UniformBufferObject)));
 
   // Create a descriptor set layout
   VkDescriptorSetLayoutBinding descriptorSetLayoutBinding{};
@@ -262,21 +262,6 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   vkDestroyShaderModule(device, vertexShaderModule, nullptr);
   vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
 
-  // Create a vertex buffer
-  constexpr size_t size = sizeof(Vertex) * vertices.size();
-  vertexBuffer = new Buffer(device, headset->getPhysicalDevice(), static_cast<VkDeviceSize>(size),
-                            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-  if (!vertexBuffer->isValid())
-  {
-    valid = false;
-    return;
-  }
-
-  // Fill a vertex buffer
-  void* data = vertexBuffer->map();
-  memcpy(data, vertices.data(), size);
-  vertexBuffer->unmap();
-
   // Create a command pool
   VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
   commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -297,6 +282,38 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     valid = false;
     return;
   }
+
+  // Create a staging buffer and fill it with the vertex data
+  constexpr size_t size = sizeof(Vertex) * vertices.size();
+  Buffer* stagingBuffer = new Buffer(device, headset->getPhysicalDevice(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                     static_cast<VkDeviceSize>(size), static_cast<const void*>(vertices.data()));
+  if (!stagingBuffer->isValid())
+  {
+    valid = false;
+    return;
+  }
+
+  // Create an empty vertex buffer
+  vertexBuffer = new Buffer(device, headset->getPhysicalDevice(),
+                            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
+  if (!vertexBuffer->isValid())
+  {
+    valid = false;
+    return;
+  }
+
+  // Copy from the staging to the vertex buffer
+  if (!stagingBuffer->copyTo(*vertexBuffer, commandBuffer, headset->getQueue()))
+  {
+    valid = false;
+    return;
+  }
+
+  // Clean up the staging buffer
+  stagingBuffer->destroy();
+  delete stagingBuffer;
 
   // Create a memory fence
   VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
@@ -342,6 +359,11 @@ void Renderer::render(size_t swapchainImageIndex) const
   }
 
   void* data = uniformBuffer->map();
+  if (!data)
+  {
+    return;
+  }
+
   memcpy(data, &ubo, sizeof(ubo));
   uniformBuffer->unmap();
 

@@ -5,10 +5,16 @@
 class Buffer final
 {
 public:
-  Buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags bufferUsageFlags);
+  Buffer(VkDevice device,
+         VkPhysicalDevice physicalDevice,
+         VkBufferUsageFlags bufferUsageFlags,
+         VkMemoryPropertyFlags memoryProperties,
+         VkDeviceSize size,
+         const void* data = nullptr);
 
   void destroy();
 
+  bool copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue queue) const;
   void* map() const;
   void unmap() const;
 

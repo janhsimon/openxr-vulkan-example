@@ -1,6 +1,13 @@
 #include "Buffer.h"
 
-Buffer::Buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags bufferUsageFlags)
+#include <cstring>
+
+Buffer::Buffer(VkDevice device,
+               VkPhysicalDevice physicalDevice,
+               VkBufferUsageFlags bufferUsageFlags,
+               VkMemoryPropertyFlags memoryProperties,
+               VkDeviceSize size,
+               const void* data)
 : device(device), size(size)
 {
   VkBufferCreateInfo bufferCreateInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
@@ -16,17 +23,16 @@ Buffer::Buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize si
   VkMemoryRequirements memoryRequirements;
   vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
 
-  VkPhysicalDeviceMemoryProperties memoryProperties;
-  vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+  VkPhysicalDeviceMemoryProperties supportedMemoryProperties;
+  vkGetPhysicalDeviceMemoryProperties(physicalDevice, &supportedMemoryProperties);
 
-  const uint32_t properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   const VkMemoryPropertyFlags typeFilter = memoryRequirements.memoryTypeBits;
   uint32_t memoryTypeIndex = 0u;
   bool memoryTypeFound = false;
-  for (uint32_t i = 0u; i < memoryProperties.memoryTypeCount; ++i)
+  for (uint32_t i = 0u; i < supportedMemoryProperties.memoryTypeCount; ++i)
   {
-    const VkMemoryPropertyFlags propertyFlags = memoryProperties.memoryTypes[i].propertyFlags;
-    if (typeFilter & (1 << i) && (propertyFlags & properties) == properties)
+    const VkMemoryPropertyFlags propertyFlags = supportedMemoryProperties.memoryTypes[i].propertyFlags;
+    if (typeFilter & (1 << i) && (propertyFlags & memoryProperties) == memoryProperties)
     {
       memoryTypeIndex = i;
       memoryTypeFound = true;
@@ -54,6 +60,20 @@ Buffer::Buffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize si
     valid = false;
     return;
   }
+
+  // Fill the buffer with data
+  if (data)
+  {
+    void* bufferData = map();
+    if (!bufferData)
+    {
+      valid = false;
+      return;
+    }
+
+    memcpy(bufferData, data, size);
+    unmap();
+  }
 }
 
 void Buffer::destroy()
@@ -68,10 +88,45 @@ void Buffer::destroy()
   vkDestroyBuffer(device, buffer, nullptr);
 }
 
+bool Buffer::copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue queue) const
+{
+  VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+  {
+    return false;
+  }
+
+  VkBufferCopy copyRegion{};
+  copyRegion.size = size;
+  vkCmdCopyBuffer(commandBuffer, buffer, target.getBuffer(), 1u, &copyRegion);
+
+  if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+  {
+    return false;
+  }
+
+  VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+  submitInfo.commandBufferCount = 1u;
+  submitInfo.pCommandBuffers = &commandBuffer;
+  if (vkQueueSubmit(queue, 1u, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
+  {
+    return false;
+  }
+
+  if (vkQueueWaitIdle(queue) != VK_SUCCESS)
+  {
+    return false;
+  }
+
+  return true;
+}
+
 void* Buffer::map() const
 {
   void* data;
-  if (vkMapMemory(device, deviceMemory, 0u, size, 0, &data) != VK_SUCCESS)
+  VkResult result = vkMapMemory(device, deviceMemory, 0u, size, 0, &data);
+  if (result != VK_SUCCESS)
   {
     return nullptr;
   }
