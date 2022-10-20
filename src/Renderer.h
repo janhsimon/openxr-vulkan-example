@@ -29,5 +29,5 @@ private:
   VkCommandBuffer commandBuffer = nullptr;
   VkFence fence = nullptr;
   Buffer *uniformBuffer = nullptr, *vertexBuffer = nullptr, *indexBuffer = nullptr;
-  Pipeline *gridPipeline = nullptr, *wallPipeline = nullptr;
+  Pipeline *gridPipeline = nullptr, *cubePipeline = nullptr;
 };

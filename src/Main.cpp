@@ -1,6 +1,5 @@
 #include "Headset.h"
 #include "MirrorView.h"
-#include "RenderTarget.h"
 #include "Renderer.h"
 
 #include <boxer/boxer.h>
@@ -54,18 +53,16 @@ int main()
   {
     mirrorView.processWindowEvents();
 
-    uint32_t imageIndex;
-    Headset::BeginFrameResult result = headset.beginFrame(imageIndex);
+    uint32_t swapchainImageIndex;
+    Headset::BeginFrameResult result = headset.beginFrame(swapchainImageIndex);
     if (result == Headset::BeginFrameResult::Error)
     {
       return EXIT_FAILURE;
     }
     else if (result == Headset::BeginFrameResult::RenderFully)
     {
-      renderer.render(imageIndex);
-
-      const VkImage mirrorImage = headset.getRenderTarget(imageIndex)->getImage();
-      mirrorView.render(mirrorImage, headset.getEyeResolution(0u));
+      renderer.render(swapchainImageIndex);
+      mirrorView.render(swapchainImageIndex);
     }
 
     if (result == Headset::BeginFrameResult::RenderFully || result == Headset::BeginFrameResult::SkipRender)

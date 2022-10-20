@@ -1,6 +1,7 @@
 #include "MirrorView.h"
 
 #include "Headset.h"
+#include "RenderTarget.h"
 
 #include <glfw/glfw3.h>
 
@@ -194,7 +195,7 @@ void MirrorView::processWindowEvents() const
   glfwPollEvents();
 }
 
-void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
+void MirrorView::render(uint32_t swapchainImageIndex)
 {
   const VkDevice device = headset->getDevice();
 
@@ -253,7 +254,9 @@ void MirrorView::render(VkImage sourceImage, VkExtent2D resolution)
     return;
   }
 
+  const VkImage sourceImage = headset->getRenderTarget(swapchainImageIndex)->getImage();
   const VkImage destinationImage = swapchainImages.at(destinationImageIndex);
+  const VkExtent2D resolution = headset->getEyeResolution(mirrorEyeIndex);
 
   // Convert the source image layout from undefined to transfer source
   VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };

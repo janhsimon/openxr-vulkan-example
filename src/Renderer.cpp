@@ -22,26 +22,30 @@ constexpr std::array vertices = {
   Vertex({ -20.0f, 0.0f, -20.0f }, { 1.0f, 0.0f, 0.0f }), Vertex({ -20.0f, 0.0f, +20.0f }, { 0.0f, 1.0f, 0.0f }),
   Vertex({ +20.0f, 0.0f, -20.0f }, { 0.0f, 0.0f, 1.0f }), Vertex({ +20.0f, 0.0f, +20.0f }, { 1.0f, 0.0f, 1.0f }),
 
-  // Front left wall
-  Vertex({ -1.0f, 0.0f, -3.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ -1.0f, 1.0f, -3.0f }, { 1.0f, 1.0f, 1.0f }),
-  Vertex({ +0.0f, 0.0f, -2.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ +0.0f, 1.0f, -2.0f }, { 1.0f, 1.0f, 1.0f }),
-
-  // Front right wall
+  // Cube front left
+  Vertex({ -1.0f, 0.0f, -3.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ -1.0f, 1.0f, -3.0f }, { 0.8f, 0.8f, 0.8f }),
   Vertex({ +0.0f, 0.0f, -2.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ +0.0f, 1.0f, -2.0f }, { 0.8f, 0.8f, 0.8f }),
-  Vertex({ +1.0f, 0.0f, -3.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ +1.0f, 1.0f, -3.0f }, { 0.8f, 0.8f, 0.8f }),
 
-  // Back left wall
-  Vertex({ -1.0f, 0.0f, -4.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ -1.0f, 1.0f, -4.0f }, { 1.0f, 1.0f, 1.0f }),
-  Vertex({ +0.0f, 0.0f, -5.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ +0.0f, 1.0f, -5.0f }, { 1.0f, 1.0f, 1.0f }),
+  // Cube front right
+  Vertex({ +0.0f, 0.0f, -2.0f }, { 0.6f, 0.6f, 0.6f }), Vertex({ +0.0f, 1.0f, -2.0f }, { 0.6f, 0.6f, 0.8f }),
+  Vertex({ +1.0f, 0.0f, -3.0f }, { 0.6f, 0.6f, 0.6f }), Vertex({ +1.0f, 1.0f, -3.0f }, { 0.6f, 0.6f, 0.8f }),
 
-  // Back right wall
-  Vertex({ +0.0f, 0.0f, -5.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ +0.0f, 1.0f, -5.0f }, { 0.8f, 0.8f, 0.8f }),
-  Vertex({ +1.0f, 0.0f, -4.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ +1.0f, 1.0f, -4.0f }, { 0.8f, 0.8f, 0.8f })
+  // Cube back left
+  Vertex({ -1.0f, 0.0f, -3.0f }, { 0.4f, 0.4f, 0.4f }), Vertex({ -1.0f, 1.0f, -3.0f }, { 0.4f, 0.4f, 0.4f }),
+  Vertex({ +0.0f, 0.0f, -4.0f }, { 0.4f, 0.4f, 0.4f }), Vertex({ +0.0f, 1.0f, -4.0f }, { 0.4f, 0.4f, 0.4f }),
+
+  // Cube back right
+  Vertex({ +0.0f, 0.0f, -4.0f }, { 0.2f, 0.2f, 0.2f }), Vertex({ +0.0f, 1.0f, -4.0f }, { 0.2f, 0.2f, 0.2f }),
+  Vertex({ +1.0f, 0.0f, -3.0f }, { 0.2f, 0.2f, 0.2f }), Vertex({ +1.0f, 1.0f, -3.0f }, { 0.2f, 0.2f, 0.2f }),
+
+  // Cube top
+  Vertex({ -1.0f, 1.0f, -3.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ +0.0f, 1.0f, -4.0f }, { 1.0f, 1.0f, 1.0f }),
+  Vertex({ +1.0f, 1.0f, -3.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ +0.0f, 1.0f, -2.0f }, { 1.0f, 1.0f, 1.0f })
 };
 
-constexpr std::array<uint16_t, 30u> indices = { 0u,  1u,  2u,  1u,  2u,  3u,  4u,  5u,  6u,  5u,
-                                                6u,  7u,  8u,  9u,  10u, 9u,  10u, 11u, 12u, 13u,
-                                                14u, 13u, 14u, 15u, 16u, 17u, 18u, 17u, 18u, 19u };
+constexpr std::array<uint16_t, 36u> indices = { 0u,  1u,  2u,  1u,  2u,  3u,  4u,  5u,  6u,  5u,  6u,  7u,
+                                                8u,  9u,  10u, 9u,  10u, 11u, 12u, 13u, 14u, 13u, 14u, 15u,
+                                                16u, 17u, 18u, 17u, 18u, 19u, 20u, 21u, 22u, 20u, 22u, 23u };
 
 struct UniformBufferObject final
 {
@@ -153,11 +157,11 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Create the wall pipeline
-  wallPipeline = new Pipeline(device, pipelineLayout, headset->getRenderPass(), "shaders/Basic.vert.spv",
-                              "shaders/Wall.frag.spv", { vertexInputBindingDescription },
+  // Create the cube pipeline
+  cubePipeline = new Pipeline(device, pipelineLayout, headset->getRenderPass(), "shaders/Basic.vert.spv",
+                              "shaders/Cube.frag.spv", { vertexInputBindingDescription },
                               { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor });
-  if (!wallPipeline->isValid())
+  if (!cubePipeline->isValid())
   {
     valid = false;
     return;
@@ -277,8 +281,8 @@ void Renderer::destroy() const
 
   vkDestroyCommandPool(device, commandPool, nullptr);
 
-  wallPipeline->destroy();
-  delete wallPipeline;
+  cubePipeline->destroy();
+  delete cubePipeline;
 
   gridPipeline->destroy();
   delete gridPipeline;
@@ -375,9 +379,9 @@ void Renderer::render(size_t swapchainImageIndex) const
   gridPipeline->bind(commandBuffer);
   vkCmdDrawIndexed(commandBuffer, 6u, 1u, 0u, 0u, 0u);
 
-  // Draw the wall
-  wallPipeline->bind(commandBuffer);
-  vkCmdDrawIndexed(commandBuffer, 24u, 1u, 6u, 0u, 0u);
+  // Draw the cube
+  cubePipeline->bind(commandBuffer);
+  vkCmdDrawIndexed(commandBuffer, 30u, 1u, 6u, 0u, 0u);
 
   vkCmdEndRenderPass(commandBuffer);
 

@@ -24,7 +24,7 @@ public:
   void onWindowResize();
 
   void processWindowEvents() const;
-  void render(VkImage sourceImage, VkExtent2D resolution);
+  void render(uint32_t swapchainImageIndex);
 
   Error getError() const;
   bool windowShouldClose() const;

@@ -3,8 +3,8 @@ set(TARGET_NAME xrvk)
 set(SHADER_SRC
   shaders/Basic.vert
 
+  shaders/Cube.frag
   shaders/Grid.frag
-  shaders/Wall.frag
 )
 
 set(SRC
