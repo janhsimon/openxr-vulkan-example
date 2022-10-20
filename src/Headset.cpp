@@ -960,10 +960,8 @@ Headset::Headset()
     imageViewCreateInfo.image = vk.depthImage;
     imageViewCreateInfo.format = depthFormat;
     imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-    imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+                                       VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
     imageViewCreateInfo.subresourceRange.layerCount = 2u;
     imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     imageViewCreateInfo.subresourceRange.baseArrayLayer = 0u;

@@ -16,10 +16,8 @@ RenderTarget::RenderTarget(VkDevice device,
   imageViewCreateInfo.image = image;
   imageViewCreateInfo.format = format;
   imageViewCreateInfo.viewType = (layerCount == 1u ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY);
-  imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-  imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-  imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-  imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+  imageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+                                     VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
   imageViewCreateInfo.subresourceRange.layerCount = layerCount;
   imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageViewCreateInfo.subresourceRange.baseArrayLayer = 0u;
