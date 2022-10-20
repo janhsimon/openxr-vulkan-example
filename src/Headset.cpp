@@ -18,6 +18,7 @@ inline constexpr XrViewConfigurationType viewType = XR_VIEW_CONFIGURATION_TYPE_P
 inline constexpr XrEnvironmentBlendMode environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 inline constexpr XrReferenceSpaceType spaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
 inline constexpr VkFormat colorFormat = VK_FORMAT_R8G8B8A8_SRGB;
+inline constexpr VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 
 bool loadXrExtensionFunction(XrInstance instance, const std::string& name, PFN_xrVoidFunction* function)
 {
@@ -755,15 +756,32 @@ Headset::Headset()
     colorAttachmentReference.attachment = 0u;
     colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription depthAttachmentDescription{};
+    depthAttachmentDescription.format = depthFormat;
+    depthAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentReference;
+    depthAttachmentReference.attachment = 1u;
+    depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpassDescription{};
     subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpassDescription.colorAttachmentCount = 1u;
     subpassDescription.pColorAttachments = &colorAttachmentReference;
+    subpassDescription.pDepthStencilAttachment = &depthAttachmentReference;
+
+    const std::array attachments = { colorAttachmentDescription, depthAttachmentDescription };
 
     VkRenderPassCreateInfo renderPassCreateInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
     renderPassCreateInfo.pNext = &renderPassMultiviewCreateInfo;
-    renderPassCreateInfo.attachmentCount = 1u;
-    renderPassCreateInfo.pAttachments = &colorAttachmentDescription;
+    renderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    renderPassCreateInfo.pAttachments = attachments.data();
     renderPassCreateInfo.subpassCount = 1u;
     renderPassCreateInfo.pSubpasses = &subpassDescription;
     if (vkCreateRenderPass(vk.device, &renderPassCreateInfo, nullptr, &vk.renderPass) != VK_SUCCESS)
@@ -871,6 +889,93 @@ Headset::Headset()
     }
   }
 
+  const VkExtent2D eyeResolution = getEyeResolution(0u);
+
+  // Create a depth buffer
+  {
+    // Create an image
+    VkImageCreateInfo imageCreateInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageCreateInfo.extent.width = eyeResolution.width;
+    imageCreateInfo.extent.height = eyeResolution.height;
+    imageCreateInfo.extent.depth = 1u;
+    imageCreateInfo.mipLevels = 1u;
+    imageCreateInfo.arrayLayers = 2u;
+    imageCreateInfo.format = depthFormat;
+    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    if (vkCreateImage(vk.device, &imageCreateInfo, nullptr, &vk.depthImage) != VK_SUCCESS)
+    {
+      error = Error::Vulkan;
+      return;
+    }
+
+    VkMemoryRequirements memoryRequirements;
+    vkGetImageMemoryRequirements(vk.device, vk.depthImage, &memoryRequirements);
+
+    VkPhysicalDeviceMemoryProperties supportedMemoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(vk.physicalDevice, &supportedMemoryProperties);
+
+    const VkMemoryPropertyFlags memoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    const VkMemoryPropertyFlags typeFilter = memoryRequirements.memoryTypeBits;
+    uint32_t memoryTypeIndex = 0u;
+    bool memoryTypeFound = false;
+    for (uint32_t i = 0u; i < supportedMemoryProperties.memoryTypeCount; ++i)
+    {
+      const VkMemoryPropertyFlags propertyFlags = supportedMemoryProperties.memoryTypes[i].propertyFlags;
+      if (typeFilter & (1 << i) && (propertyFlags & memoryProperties) == memoryProperties)
+      {
+        memoryTypeIndex = i;
+        memoryTypeFound = true;
+        break;
+      }
+    }
+
+    if (!memoryTypeFound)
+    {
+      error = Error::Vulkan;
+      return;
+    }
+
+    VkMemoryAllocateInfo memoryAllocateInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    memoryAllocateInfo.allocationSize = memoryRequirements.size;
+    memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
+    if (vkAllocateMemory(vk.device, &memoryAllocateInfo, nullptr, &vk.depthMemory) != VK_SUCCESS)
+    {
+      error = Error::Vulkan;
+      return;
+    }
+
+    if (vkBindImageMemory(vk.device, vk.depthImage, vk.depthMemory, 0) != VK_SUCCESS)
+    {
+      error = Error::Vulkan;
+      return;
+    }
+
+    // Create an image view
+    VkImageViewCreateInfo imageViewCreateInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    imageViewCreateInfo.image = vk.depthImage;
+    imageViewCreateInfo.format = depthFormat;
+    imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imageViewCreateInfo.subresourceRange.layerCount = 2u;
+    imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    imageViewCreateInfo.subresourceRange.baseArrayLayer = 0u;
+    imageViewCreateInfo.subresourceRange.baseMipLevel = 0u;
+    imageViewCreateInfo.subresourceRange.levelCount = 1u;
+    if (vkCreateImageView(vk.device, &imageViewCreateInfo, nullptr, &vk.depthImageView) != VK_SUCCESS)
+    {
+      error = Error::Vulkan;
+      return;
+    }
+  }
+
   // Create a swapchain and render targets
   {
     const XrViewConfigurationView& eyeImageInfo = xr.eyeImageInfos.at(0u);
@@ -925,7 +1030,8 @@ Headset::Headset()
       RenderTarget*& renderTarget = xr.swapchainRenderTargets.at(renderTargetIndex);
 
       const VkImage image = swapchainImages.at(renderTargetIndex).image;
-      renderTarget = new RenderTarget(vk.device, image, getEyeResolution(0u), colorFormat, vk.renderPass, 2u);
+      renderTarget =
+        new RenderTarget(vk.device, image, vk.depthImageView, eyeResolution, colorFormat, vk.renderPass, 2u);
       if (!renderTarget->isValid())
       {
         error = Error::Vulkan;
@@ -983,6 +1089,9 @@ void Headset::destroy() const
   xrDestroyInstance(xr.instance);
 
   // Clean up Vulkan
+  vkDestroyImageView(vk.device, vk.depthImageView, nullptr);
+  vkFreeMemory(vk.device, vk.depthMemory, nullptr);
+  vkDestroyImage(vk.device, vk.depthImage, nullptr);
   vkDestroyRenderPass(vk.device, vk.renderPass, nullptr);
   vkDestroyDevice(vk.device, nullptr);
 

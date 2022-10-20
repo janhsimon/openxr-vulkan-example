@@ -2,7 +2,9 @@ set(TARGET_NAME xrvk)
 
 set(SHADER_SRC
   shaders/Basic.vert
-  shaders/Basic.frag
+
+  shaders/Grid.frag
+  shaders/Wall.frag
 )
 
 set(SRC
@@ -16,6 +18,9 @@ set(SRC
 
   MirrorView.cpp
   MirrorView.h
+
+  Pipeline.cpp
+  Pipeline.h
 
   Renderer.cpp
   Renderer.h

@@ -4,6 +4,7 @@
 
 class Buffer;
 class Headset;
+class Pipeline;
 
 class Renderer final
 {
@@ -24,10 +25,9 @@ private:
   VkDescriptorPool descriptorPool = nullptr;
   VkDescriptorSet descriptorSet = nullptr;
   VkPipelineLayout pipelineLayout = nullptr;
-  VkPipeline pipeline = nullptr;
   VkCommandPool commandPool = nullptr;
   VkCommandBuffer commandBuffer = nullptr;
   VkFence fence = nullptr;
-
   Buffer *uniformBuffer = nullptr, *vertexBuffer = nullptr, *indexBuffer = nullptr;
+  Pipeline *gridPipeline = nullptr, *wallPipeline = nullptr;
 };

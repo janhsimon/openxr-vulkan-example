@@ -98,6 +98,9 @@ private:
     VkDevice device = nullptr;
     VkQueue queue = nullptr;
     VkRenderPass renderPass = nullptr;
+    VkImage depthImage = nullptr;
+    VkDeviceMemory depthMemory = nullptr;
+    VkImageView depthImageView = nullptr;
 
 #ifdef DEBUG
     PFN_vkCreateDebugUtilsMessengerEXT createDebugUtilsMessengerEXT = nullptr;

@@ -1,7 +1,10 @@
 #include "RenderTarget.h"
 
+#include <vector>
+
 RenderTarget::RenderTarget(VkDevice device,
                            VkImage image,
+                           VkImageView depthImageView,
                            VkExtent2D size,
                            VkFormat format,
                            VkRenderPass renderPass,
@@ -28,11 +31,17 @@ RenderTarget::RenderTarget(VkDevice device,
     return;
   }
 
+  std::vector<VkImageView> attachments = { imageView };
+  if (depthImageView)
+  {
+    attachments.emplace_back(depthImageView);
+  }
+
   // Create a framebuffer
   VkFramebufferCreateInfo framebufferCreateInfo{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
   framebufferCreateInfo.renderPass = renderPass;
-  framebufferCreateInfo.attachmentCount = 1u;
-  framebufferCreateInfo.pAttachments = &imageView;
+  framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+  framebufferCreateInfo.pAttachments = attachments.data();
   framebufferCreateInfo.width = size.width;
   framebufferCreateInfo.height = size.height;
   framebufferCreateInfo.layers = 1u;

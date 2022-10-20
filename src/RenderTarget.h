@@ -7,6 +7,7 @@ class RenderTarget final
 public:
   RenderTarget(VkDevice device,
                VkImage image,
+               VkImageView depthImageView,
                VkExtent2D size,
                VkFormat format,
                VkRenderPass renderPass,

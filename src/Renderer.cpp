@@ -2,12 +2,12 @@
 
 #include "Buffer.h"
 #include "Headset.h"
+#include "Pipeline.h"
 #include "RenderTarget.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <array>
-#include <fstream>
 
 namespace
 {
@@ -17,12 +17,31 @@ struct Vertex final
   glm::vec3 color;
 };
 
-constexpr std::array vertices = { Vertex({ -20.0f, 0.0f, -20.0f }, { 1.0f, 0.0f, 0.0f }),
-                                  Vertex({ -20.0f, 0.0f, +20.0f }, { 0.0f, 1.0f, 0.0f }),
-                                  Vertex({ +20.0f, 0.0f, -20.0f }, { 0.0f, 0.0f, 1.0f }),
-                                  Vertex({ +20.0f, 0.0f, +20.0f }, { 1.0f, 0.0f, 1.0f }) };
+constexpr std::array vertices = {
+  // Grid
+  Vertex({ -20.0f, 0.0f, -20.0f }, { 1.0f, 0.0f, 0.0f }), Vertex({ -20.0f, 0.0f, +20.0f }, { 0.0f, 1.0f, 0.0f }),
+  Vertex({ +20.0f, 0.0f, -20.0f }, { 0.0f, 0.0f, 1.0f }), Vertex({ +20.0f, 0.0f, +20.0f }, { 1.0f, 0.0f, 1.0f }),
 
-constexpr std::array<uint16_t, 6u> indices = { 0u, 1u, 2u, 1u, 2u, 3u };
+  // Front left wall
+  Vertex({ -1.0f, 0.0f, -3.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ -1.0f, 1.0f, -3.0f }, { 1.0f, 1.0f, 1.0f }),
+  Vertex({ +0.0f, 0.0f, -2.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ +0.0f, 1.0f, -2.0f }, { 1.0f, 1.0f, 1.0f }),
+
+  // Front right wall
+  Vertex({ +0.0f, 0.0f, -2.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ +0.0f, 1.0f, -2.0f }, { 0.8f, 0.8f, 0.8f }),
+  Vertex({ +1.0f, 0.0f, -3.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ +1.0f, 1.0f, -3.0f }, { 0.8f, 0.8f, 0.8f }),
+
+  // Back left wall
+  Vertex({ -1.0f, 0.0f, -4.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ -1.0f, 1.0f, -4.0f }, { 1.0f, 1.0f, 1.0f }),
+  Vertex({ +0.0f, 0.0f, -5.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ +0.0f, 1.0f, -5.0f }, { 1.0f, 1.0f, 1.0f }),
+
+  // Back right wall
+  Vertex({ +0.0f, 0.0f, -5.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ +0.0f, 1.0f, -5.0f }, { 0.8f, 0.8f, 0.8f }),
+  Vertex({ +1.0f, 0.0f, -4.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ +1.0f, 1.0f, -4.0f }, { 0.8f, 0.8f, 0.8f })
+};
+
+constexpr std::array<uint16_t, 30u> indices = { 0u,  1u,  2u,  1u,  2u,  3u,  4u,  5u,  6u,  5u,
+                                                6u,  7u,  8u,  9u,  10u, 9u,  10u, 11u, 12u, 13u,
+                                                14u, 13u, 14u, 15u, 16u, 17u, 18u, 17u, 18u, 19u };
 
 struct UniformBufferObject final
 {
@@ -30,34 +49,6 @@ struct UniformBufferObject final
   glm::mat4 view[2];
   glm::mat4 projection[2];
 } ubo;
-
-bool loadShaderFromFile(VkDevice device, const std::string& filename, VkShaderModule& shaderModule)
-{
-  std::ifstream file(filename, std::ios::ate | std::ios::binary);
-  if (!file.is_open())
-  {
-    return false;
-  }
-
-  const size_t fileSize = static_cast<size_t>(file.tellg());
-  std::vector<char> code(fileSize);
-  file.seekg(0);
-  file.read(code.data(), fileSize);
-  file.close();
-
-  VkShaderModuleCreateInfo shaderModuleCreateInfo;
-  shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  shaderModuleCreateInfo.pNext = nullptr;
-  shaderModuleCreateInfo.flags = 0u;
-  shaderModuleCreateInfo.codeSize = code.size();
-  shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-  if (vkCreateShaderModule(device, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS)
-  {
-    return false;
-  }
-
-  return true;
-}
 } // namespace
 
 Renderer::Renderer(const Headset* headset) : headset(headset)
@@ -135,40 +126,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Create a pipeline
-  VkShaderModule vertexShaderModule;
-  if (!loadShaderFromFile(device, "shaders/basic.vert.spv", vertexShaderModule))
-  {
-    valid = false;
-    return;
-  }
-
-  VkShaderModule fragmentShaderModule;
-  if (!loadShaderFromFile(device, "shaders/basic.frag.spv", fragmentShaderModule))
-  {
-    valid = false;
-    return;
-  }
-
-  VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfoVertex{
-    VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO
-  };
-  pipelineShaderStageCreateInfoVertex.module = vertexShaderModule;
-  pipelineShaderStageCreateInfoVertex.stage = VK_SHADER_STAGE_VERTEX_BIT;
-  pipelineShaderStageCreateInfoVertex.pName = "main";
-
-  VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfoFragment{
-    VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO
-  };
-  pipelineShaderStageCreateInfoFragment.module = fragmentShaderModule;
-  pipelineShaderStageCreateInfoFragment.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  pipelineShaderStageCreateInfoFragment.pName = "main";
-
-  const std::array shaderStages = { pipelineShaderStageCreateInfoVertex, pipelineShaderStageCreateInfoFragment };
-
-  VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{
-    VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
-  };
+  // Create the grid pipeline
   VkVertexInputBindingDescription vertexInputBindingDescription;
   vertexInputBindingDescription.binding = 0u;
   vertexInputBindingDescription.stride = sizeof(Vertex);
@@ -186,82 +144,24 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   vertexInputAttributeDescriptionColor.format = VK_FORMAT_R32G32B32_SFLOAT;
   vertexInputAttributeDescriptionColor.offset = offsetof(Vertex, color);
 
-  const std::array vertexInputAttributeDescriptions = { vertexInputAttributeDescriptionPosition,
-                                                        vertexInputAttributeDescriptionColor };
-
-  pipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 1u;
-  pipelineVertexInputStateCreateInfo.pVertexBindingDescriptions = &vertexInputBindingDescription;
-  pipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount =
-    static_cast<uint32_t>(vertexInputAttributeDescriptions.size());
-  pipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = vertexInputAttributeDescriptions.data();
-
-  VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo{
-    VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO
-  };
-  pipelineInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-
-  VkPipelineViewportStateCreateInfo pipelineViewportStateCreateInfo{
-    VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO
-  };
-  pipelineViewportStateCreateInfo.viewportCount = 1u;
-  pipelineViewportStateCreateInfo.scissorCount = 1u;
-
-  VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo{
-    VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO
-  };
-  pipelineRasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-  pipelineRasterizationStateCreateInfo.lineWidth = 1.0f;
-  pipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
-
-  VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo{
-    VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO
-  };
-  pipelineMultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-  VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo{
-    VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO
-  };
-  VkPipelineColorBlendAttachmentState pipelineColorBlendAttachmentState{};
-  pipelineColorBlendAttachmentState.colorWriteMask =
-    VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-  pipelineColorBlendAttachmentState.blendEnable = VK_TRUE;
-  pipelineColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-  pipelineColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-  pipelineColorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
-  pipelineColorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-  pipelineColorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-  pipelineColorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
-
-  pipelineColorBlendStateCreateInfo.attachmentCount = 1;
-  pipelineColorBlendStateCreateInfo.pAttachments = &pipelineColorBlendAttachmentState;
-
-  VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{
-    VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO
-  };
-  const std::array dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-  pipelineDynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
-  pipelineDynamicStateCreateInfo.pDynamicStates = dynamicStates.data();
-
-  VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-  graphicsPipelineCreateInfo.layout = pipelineLayout;
-  graphicsPipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
-  graphicsPipelineCreateInfo.pStages = shaderStages.data();
-  graphicsPipelineCreateInfo.pVertexInputState = &pipelineVertexInputStateCreateInfo;
-  graphicsPipelineCreateInfo.pInputAssemblyState = &pipelineInputAssemblyStateCreateInfo;
-  graphicsPipelineCreateInfo.pViewportState = &pipelineViewportStateCreateInfo;
-  graphicsPipelineCreateInfo.pRasterizationState = &pipelineRasterizationStateCreateInfo;
-  graphicsPipelineCreateInfo.pMultisampleState = &pipelineMultisampleStateCreateInfo;
-  graphicsPipelineCreateInfo.pColorBlendState = &pipelineColorBlendStateCreateInfo;
-  graphicsPipelineCreateInfo.pDynamicState = &pipelineDynamicStateCreateInfo;
-  graphicsPipelineCreateInfo.renderPass = headset->getRenderPass();
-  if (vkCreateGraphicsPipelines(device, nullptr, 1u, &graphicsPipelineCreateInfo, nullptr, &pipeline) != VK_SUCCESS)
+  gridPipeline = new Pipeline(device, pipelineLayout, headset->getRenderPass(), "shaders/Basic.vert.spv",
+                              "shaders/Grid.frag.spv", { vertexInputBindingDescription },
+                              { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor });
+  if (!gridPipeline->isValid())
   {
     valid = false;
     return;
   }
 
-  vkDestroyShaderModule(device, vertexShaderModule, nullptr);
-  vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
+  // Create the wall pipeline
+  wallPipeline = new Pipeline(device, pipelineLayout, headset->getRenderPass(), "shaders/Basic.vert.spv",
+                              "shaders/Wall.frag.spv", { vertexInputBindingDescription },
+                              { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor });
+  if (!wallPipeline->isValid())
+  {
+    valid = false;
+    return;
+  }
 
   // Create a command pool
   VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
@@ -376,7 +276,13 @@ void Renderer::destroy() const
   delete vertexBuffer;
 
   vkDestroyCommandPool(device, commandPool, nullptr);
-  vkDestroyPipeline(device, pipeline, nullptr);
+
+  wallPipeline->destroy();
+  delete wallPipeline;
+
+  gridPipeline->destroy();
+  delete gridPipeline;
+
   vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
   vkDestroyDescriptorPool(device, descriptorPool, nullptr);
   vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
@@ -425,19 +331,17 @@ void Renderer::render(size_t swapchainImageIndex) const
     return;
   }
 
-  const VkClearValue clearColor = { { { 0.5f, 0.5f, 0.5f, 1.0f } } };
+  const std::array clearValues = { VkClearValue({ 0.5f, 0.5f, 0.5f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
 
   VkRenderPassBeginInfo renderPassBeginInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
   renderPassBeginInfo.renderPass = headset->getRenderPass();
   renderPassBeginInfo.framebuffer = headset->getRenderTarget(swapchainImageIndex)->getFramebuffer();
   renderPassBeginInfo.renderArea.offset = { 0, 0 };
   renderPassBeginInfo.renderArea.extent = headset->getEyeResolution(0u);
-  renderPassBeginInfo.clearValueCount = 1u;
-  renderPassBeginInfo.pClearValues = &clearColor;
+  renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+  renderPassBeginInfo.pClearValues = clearValues.data();
 
   vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
   // Set the viewport
   VkViewport viewport;
@@ -467,7 +371,13 @@ void Renderer::render(size_t swapchainImageIndex) const
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0u, 1u, &descriptorSet, 0u,
                           nullptr);
 
-  vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1u, 0u, 0u, 0u);
+  // Draw the grid
+  gridPipeline->bind(commandBuffer);
+  vkCmdDrawIndexed(commandBuffer, 6u, 1u, 0u, 0u, 0u);
+
+  // Draw the wall
+  wallPipeline->bind(commandBuffer);
+  vkCmdDrawIndexed(commandBuffer, 24u, 1u, 6u, 0u, 0u);
 
   vkCmdEndRenderPass(commandBuffer);
 
