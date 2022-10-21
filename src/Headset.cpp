@@ -566,7 +566,7 @@ Headset::Headset()
     return;
   }
 
-  // Pick a draw queue family index
+  // Pick the draw queue family index
   {
     // Retrieve the queue families
     std::vector<VkQueueFamilyProperties> queueFamilies;
@@ -576,7 +576,7 @@ Headset::Headset()
     queueFamilies.resize(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, queueFamilies.data());
 
-    bool queueFamilyIndexFound = false;
+    bool drawQueueFamilyIndexFound = false;
     for (size_t queueFamilyIndexCandidate = 0u; queueFamilyIndexCandidate < queueFamilies.size();
          ++queueFamilyIndexCandidate)
     {
@@ -591,13 +591,13 @@ Headset::Headset()
       // Check the queue family for drawing support
       if (queueFamilyCandidate.queueFlags & VK_QUEUE_GRAPHICS_BIT)
       {
-        vk.queueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
-        queueFamilyIndexFound = true;
+        vk.drawQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
+        drawQueueFamilyIndexFound = true;
         break;
       }
     }
 
-    if (!queueFamilyIndexFound)
+    if (!drawQueueFamilyIndexFound)
     {
       error = Error::Vulkan;
       return;
@@ -676,7 +676,7 @@ Headset::Headset()
     constexpr float queuePriority = 1.0f;
 
     VkDeviceQueueCreateInfo deviceQueueCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-    deviceQueueCreateInfo.queueFamilyIndex = vk.queueFamilyIndex;
+    deviceQueueCreateInfo.queueFamilyIndex = vk.drawQueueFamilyIndex;
     deviceQueueCreateInfo.queueCount = 1u;
     deviceQueueCreateInfo.pQueuePriorities = &queuePriority;
 
@@ -727,7 +727,8 @@ Headset::Headset()
     return;
   }
 
-  vkGetDeviceQueue(vk.device, vk.queueFamilyIndex, 0u, &vk.queue);
+  // Retrieve the draw queue
+  vkGetDeviceQueue(vk.device, vk.drawQueueFamilyIndex, 0u, &vk.drawQueue);
 
   // Create a render pass
   {
@@ -796,7 +797,7 @@ Headset::Headset()
   graphicsBinding.device = vk.device;
   graphicsBinding.instance = vk.instance;
   graphicsBinding.physicalDevice = vk.physicalDevice;
-  graphicsBinding.queueFamilyIndex = vk.queueFamilyIndex;
+  graphicsBinding.queueFamilyIndex = vk.drawQueueFamilyIndex;
   graphicsBinding.queueIndex = 0u;
 
   XrSessionCreateInfo sessionCreateInfo{ XR_TYPE_SESSION_CREATE_INFO };
@@ -1058,6 +1059,50 @@ Headset::Headset()
   // Allocate view and projection matrices
   eyeViewMatrices.resize(eyeCount);
   eyeProjectionMatrices.resize(eyeCount);
+
+  // Create a command pool
+  VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+  commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  commandPoolCreateInfo.queueFamilyIndex = vk.drawQueueFamilyIndex;
+  if (vkCreateCommandPool(vk.device, &commandPoolCreateInfo, nullptr, &vk.commandPool) != VK_SUCCESS)
+  {
+    error = Error::Vulkan;
+    return;
+  }
+
+  // Allocate a command buffer
+  VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+  commandBufferAllocateInfo.commandPool = vk.commandPool;
+  commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  commandBufferAllocateInfo.commandBufferCount = 1u;
+  if (vkAllocateCommandBuffers(vk.device, &commandBufferAllocateInfo, &vk.commandBuffer) != VK_SUCCESS)
+  {
+    error = Error::Vulkan;
+    return;
+  }
+
+  // Create the semaphores
+  VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+  if (vkCreateSemaphore(vk.device, &semaphoreCreateInfo, nullptr, &vk.imageAvailableSemaphore) != VK_SUCCESS)
+  {
+    error = Error::Vulkan;
+    return;
+  }
+
+  if (vkCreateSemaphore(vk.device, &semaphoreCreateInfo, nullptr, &vk.renderFinishedSemaphore) != VK_SUCCESS)
+  {
+    error = Error::Vulkan;
+    return;
+  }
+
+  // Create a memory fence
+  VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+  fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+  if (vkCreateFence(vk.device, &fenceCreateInfo, nullptr, &vk.inFlightFence) != VK_SUCCESS)
+  {
+    error = Error::Vulkan;
+    return;
+  }
 }
 
 void Headset::sync() const
@@ -1087,6 +1132,10 @@ void Headset::destroy() const
   xrDestroyInstance(xr.instance);
 
   // Clean up Vulkan
+  vkDestroyFence(vk.device, vk.inFlightFence, nullptr);
+  vkDestroySemaphore(vk.device, vk.renderFinishedSemaphore, nullptr);
+  vkDestroySemaphore(vk.device, vk.imageAvailableSemaphore, nullptr);
+  vkDestroyCommandPool(vk.device, vk.commandPool, nullptr);
   vkDestroyImageView(vk.device, vk.depthImageView, nullptr);
   vkFreeMemory(vk.device, vk.depthMemory, nullptr);
   vkDestroyImage(vk.device, vk.depthImage, nullptr);
@@ -1227,7 +1276,46 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     return BeginFrameResult::Error;
   }
 
+  if (vkResetFences(vk.device, 1u, &vk.inFlightFence) != VK_SUCCESS)
+  {
+    return BeginFrameResult::Error;
+  }
+
+  if (vkResetCommandBuffer(vk.commandBuffer, 0u) != VK_SUCCESS)
+  {
+    return BeginFrameResult::Error;
+  }
+
+  VkCommandBufferBeginInfo commandBufferBeginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+  if (vkBeginCommandBuffer(vk.commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS)
+  {
+    return BeginFrameResult::Error;
+  }
+
   return BeginFrameResult::RenderFully; // Request full rendering of the frame
+}
+
+void Headset::submit() const
+{
+  if (vkEndCommandBuffer(vk.commandBuffer) != VK_SUCCESS)
+  {
+    return;
+  }
+
+  VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+  VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+  submitInfo.waitSemaphoreCount = 1u;
+  submitInfo.pWaitSemaphores = &vk.imageAvailableSemaphore;
+  submitInfo.pWaitDstStageMask = &waitStages;
+  submitInfo.commandBufferCount = 1u;
+  submitInfo.pCommandBuffers = &vk.commandBuffer;
+  submitInfo.signalSemaphoreCount = 1u;
+  submitInfo.pSignalSemaphores = &vk.renderFinishedSemaphore;
+  if (vkQueueSubmit(vk.drawQueue, 1u, &submitInfo, vk.inFlightFence) != VK_SUCCESS)
+  {
+    return;
+  }
 }
 
 void Headset::endFrame() const
@@ -1294,14 +1382,24 @@ VkRenderPass Headset::getRenderPass() const
   return vk.renderPass;
 }
 
-uint32_t Headset::getQueueFamilyIndex() const
+VkQueue Headset::getDrawQueue() const
 {
-  return vk.queueFamilyIndex;
+  return vk.drawQueue;
 }
 
-VkQueue Headset::getQueue() const
+VkCommandBuffer Headset::getCommandBuffer() const
 {
-  return vk.queue;
+  return vk.commandBuffer;
+}
+
+VkSemaphore Headset::getImageAvailableSemaphore() const
+{
+  return vk.imageAvailableSemaphore;
+}
+
+VkSemaphore Headset::getRenderFinishedSemaphore() const
+{
+  return vk.renderFinishedSemaphore;
 }
 
 size_t Headset::getEyeCount() const

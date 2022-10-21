@@ -53,10 +53,11 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
     return;
   }
 
-  VkPhysicalDevice physicalDevice = headset->getPhysicalDevice();
-
-  // Pick the queue family indices for the physical device
+  // Pick the present queue family index
+  uint32_t presentQueueFamilyIndex;
   {
+    VkPhysicalDevice physicalDevice = headset->getPhysicalDevice();
+
     // Retrieve the queue families
     std::vector<VkQueueFamilyProperties> queueFamilies;
     uint32_t queueFamilyCount = 0u;
@@ -65,8 +66,6 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
     queueFamilies.resize(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
-    // Pick the queue family indices
-    bool drawQueueFamilyIndexFound = false;
     bool presentQueueFamilyIndexFound = false;
     for (size_t queueFamilyIndexCandidate = 0u; queueFamilyIndexCandidate < queueFamilies.size();
          ++queueFamilyIndexCandidate)
@@ -77,13 +76,6 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
       if (queueFamilyCandidate.queueCount == 0u)
       {
         continue;
-      }
-
-      // Check the queue family for drawing support
-      if (!drawQueueFamilyIndexFound && queueFamilyCandidate.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-      {
-        drawQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
-        drawQueueFamilyIndexFound = true;
       }
 
       // Check the queue family for presenting support
@@ -99,72 +91,22 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
       {
         presentQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
         presentQueueFamilyIndexFound = true;
-      }
-
-      // Stop looking if both queue families are found
-      if (drawQueueFamilyIndexFound && presentQueueFamilyIndexFound)
-      {
         break;
       }
     }
 
-    if (!drawQueueFamilyIndexFound || !presentQueueFamilyIndexFound)
+    if (!presentQueueFamilyIndexFound)
     {
       error = Error::Vulkan;
       return;
     }
   }
 
-  const VkDevice device = headset->getDevice();
-  vkGetDeviceQueue(device, drawQueueFamilyIndex, 0u, &drawQueue);
-  vkGetDeviceQueue(device, presentQueueFamilyIndex, 0u, &presentQueue);
+  // Retrieve the present queue
+  vkGetDeviceQueue(headset->getDevice(), presentQueueFamilyIndex, 0u, &presentQueue);
 
   // Create a swapchain and render targets
   if (!recreateSwapchain())
-  {
-    error = Error::Vulkan;
-    return;
-  }
-
-  // Create a command pool
-  VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-  commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  commandPoolCreateInfo.queueFamilyIndex = drawQueueFamilyIndex;
-  if (vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
-  {
-    error = Error::Vulkan;
-    return;
-  }
-
-  // Allocate a command buffer
-  VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-  commandBufferAllocateInfo.commandPool = commandPool;
-  commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  commandBufferAllocateInfo.commandBufferCount = 1u;
-  if (vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer) != VK_SUCCESS)
-  {
-    error = Error::Vulkan;
-    return;
-  }
-
-  // Create the semaphores
-  VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-  if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS)
-  {
-    error = Error::Vulkan;
-    return;
-  }
-
-  if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS)
-  {
-    error = Error::Vulkan;
-    return;
-  }
-
-  // Create a memory fence
-  VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-  fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-  if (vkCreateFence(device, &fenceCreateInfo, nullptr, &inFlightFence) != VK_SUCCESS)
   {
     error = Error::Vulkan;
     return;
@@ -173,11 +115,6 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
 
 void MirrorView::destroy() const
 {
-  const VkDevice device = headset->getDevice();
-  vkDestroyFence(device, inFlightFence, nullptr);
-  vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-  vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-  vkDestroyCommandPool(device, commandPool, nullptr);
   vkDestroySwapchainKHR(headset->getDevice(), swapchain, nullptr);
   vkDestroySurfaceKHR(headset->getInstance(), surface, nullptr);
 
@@ -195,15 +132,8 @@ void MirrorView::processWindowEvents() const
   glfwPollEvents();
 }
 
-void MirrorView::render(uint32_t swapchainImageIndex)
+bool MirrorView::render(uint32_t swapchainImageIndex)
 {
-  const VkDevice device = headset->getDevice();
-
-  if (vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
-  {
-    return;
-  }
-
   if (renderSize.width == 0u || renderSize.height == 0u)
   {
     // Just check for maximizing as long as the window is minimized
@@ -212,48 +142,32 @@ void MirrorView::render(uint32_t swapchainImageIndex)
       resizeDetected = false;
       if (!recreateSwapchain())
       {
-        return;
+        return false;
       }
     }
     else
     {
       // Otherwise skip minimized frames
-      return;
+      return false;
     }
   }
 
-  uint32_t destinationImageIndex;
-  VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE,
-                                          &destinationImageIndex);
+  VkResult result =
+    vkAcquireNextImageKHR(headset->getDevice(), swapchain, UINT64_MAX, headset->getImageAvailableSemaphore(),
+                          VK_NULL_HANDLE, &destinationImageIndex);
   if (result == VK_ERROR_OUT_OF_DATE_KHR)
   {
     // Recreate the swapchain and then stop rendering this frame as it is out of date already
     recreateSwapchain();
-    return;
+    return false;
   }
   else if (result != VK_SUBOPTIMAL_KHR && result != VK_SUCCESS)
   {
     // Just continue in case of a suboptimal
-    return;
+    return false;
   }
 
-  if (vkResetFences(device, 1, &inFlightFence) != VK_SUCCESS)
-  {
-    return;
-  }
-
-  // Reset and begin recording the command buffer
-  if (vkResetCommandBuffer(commandBuffer, 0u) != VK_SUCCESS)
-  {
-    return;
-  }
-
-  VkCommandBufferBeginInfo commandBufferBeginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-  if (vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS)
-  {
-    return;
-  }
-
+  const VkCommandBuffer commandBuffer = headset->getCommandBuffer();
   const VkImage sourceImage = headset->getRenderTarget(swapchainImageIndex)->getImage();
   const VkImage destinationImage = swapchainImages.at(destinationImageIndex);
   const VkExtent2D resolution = headset->getEyeResolution(mirrorEyeIndex);
@@ -330,29 +244,13 @@ void MirrorView::render(uint32_t swapchainImageIndex)
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
                        0u, nullptr, 1u, &imageMemoryBarrier);
 
-  // End recording the command buffer
-  if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
-  {
-    return;
-  }
+  return true;
+}
 
-  // Render
-  VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+void MirrorView::present()
+{
+  const VkSemaphore renderFinishedSemaphore = headset->getRenderFinishedSemaphore();
 
-  VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
-  submitInfo.waitSemaphoreCount = 1u;
-  submitInfo.pWaitSemaphores = &imageAvailableSemaphore;
-  submitInfo.pWaitDstStageMask = &waitStages;
-  submitInfo.commandBufferCount = 1u;
-  submitInfo.pCommandBuffers = &commandBuffer;
-  submitInfo.signalSemaphoreCount = 1u;
-  submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
-  if (vkQueueSubmit(drawQueue, 1u, &submitInfo, inFlightFence) != VK_SUCCESS)
-  {
-    return;
-  }
-
-  // Present
   VkPresentInfoKHR presentInfo{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
   presentInfo.waitSemaphoreCount = 1u;
   presentInfo.pWaitSemaphores = &renderFinishedSemaphore;
@@ -360,7 +258,7 @@ void MirrorView::render(uint32_t swapchainImageIndex)
   presentInfo.pSwapchains = &swapchain;
   presentInfo.pImageIndices = &destinationImageIndex;
 
-  result = vkQueuePresentKHR(presentQueue, &presentInfo);
+  const VkResult result = vkQueuePresentKHR(presentQueue, &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
   {
     // Recreate the swapchain for the next frame if necessary

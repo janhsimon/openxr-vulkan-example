@@ -25,9 +25,6 @@ private:
   VkDescriptorPool descriptorPool = nullptr;
   VkDescriptorSet descriptorSet = nullptr;
   VkPipelineLayout pipelineLayout = nullptr;
-  VkCommandPool commandPool = nullptr;
-  VkCommandBuffer commandBuffer = nullptr;
-  VkFence fence = nullptr;
   Buffer *uniformBuffer = nullptr, *vertexBuffer = nullptr, *indexBuffer = nullptr;
   Pipeline *gridPipeline = nullptr, *cubePipeline = nullptr;
 };

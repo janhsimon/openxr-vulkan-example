@@ -62,7 +62,13 @@ int main()
     else if (result == Headset::BeginFrameResult::RenderFully)
     {
       renderer.render(swapchainImageIndex);
-      mirrorView.render(swapchainImageIndex);
+      const bool presentMirrorView = mirrorView.render(swapchainImageIndex);
+      headset.submit();
+
+      if (presentMirrorView)
+      {
+        mirrorView.present();
+      }
     }
 
     if (result == Headset::BeginFrameResult::RenderFully || result == Headset::BeginFrameResult::SkipRender)

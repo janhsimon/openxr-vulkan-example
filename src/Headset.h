@@ -37,6 +37,7 @@ public:
     SkipFully    // Skip processing this frame entirely without ending it
   };
   BeginFrameResult beginFrame(uint32_t& swapchainImageIndex);
+  void submit() const;
   void endFrame() const;
 
   Error getError() const;
@@ -44,8 +45,10 @@ public:
   VkPhysicalDevice getPhysicalDevice() const;
   VkDevice getDevice() const;
   VkRenderPass getRenderPass() const;
-  uint32_t getQueueFamilyIndex() const;
-  VkQueue getQueue() const;
+  VkQueue getDrawQueue() const;
+  VkCommandBuffer getCommandBuffer() const;
+  VkSemaphore getImageAvailableSemaphore() const;
+  VkSemaphore getRenderFinishedSemaphore() const;
   size_t getEyeCount() const;
   VkExtent2D getEyeResolution(size_t eyeIndex) const;
   glm::mat4 getEyeViewMatrix(size_t eyeIndex) const;
@@ -94,13 +97,17 @@ private:
   {
     VkInstance instance = nullptr;
     VkPhysicalDevice physicalDevice = nullptr;
-    uint32_t queueFamilyIndex = 0u;
+    uint32_t drawQueueFamilyIndex = 0u;
     VkDevice device = nullptr;
-    VkQueue queue = nullptr;
+    VkQueue drawQueue = nullptr;
     VkRenderPass renderPass = nullptr;
     VkImage depthImage = nullptr;
     VkDeviceMemory depthMemory = nullptr;
     VkImageView depthImageView = nullptr;
+    VkCommandPool commandPool = nullptr;
+    VkCommandBuffer commandBuffer = nullptr;
+    VkSemaphore imageAvailableSemaphore = nullptr, renderFinishedSemaphore = nullptr;
+    VkFence inFlightFence = nullptr;
 
 #ifdef DEBUG
     PFN_vkCreateDebugUtilsMessengerEXT createDebugUtilsMessengerEXT = nullptr;

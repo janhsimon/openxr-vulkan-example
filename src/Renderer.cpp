@@ -50,8 +50,7 @@ constexpr std::array<uint16_t, 36u> indices = { 0u,  1u,  2u,  1u,  2u,  3u,  4u
 struct UniformBufferObject final
 {
   glm::mat4 world;
-  glm::mat4 view[2];
-  glm::mat4 projection[2];
+  glm::mat4 viewProjection[2];
 } ubo;
 } // namespace
 
@@ -167,27 +166,6 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     return;
   }
 
-  // Create a command pool
-  VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-  commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  commandPoolCreateInfo.queueFamilyIndex = headset->getQueueFamilyIndex();
-  if (vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
-  {
-    valid = false;
-    return;
-  }
-
-  // Allocate a command buffer
-  VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-  commandBufferAllocateInfo.commandPool = commandPool;
-  commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  commandBufferAllocateInfo.commandBufferCount = 1u;
-  if (vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer) != VK_SUCCESS)
-  {
-    valid = false;
-    return;
-  }
-
   // Create a vertex buffer
   {
     // Create a staging buffer and fill it with the vertex data
@@ -212,7 +190,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     }
 
     // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*vertexBuffer, commandBuffer, headset->getQueue()))
+    if (!stagingBuffer->copyTo(*vertexBuffer, headset->getCommandBuffer(), headset->getDrawQueue()))
     {
       valid = false;
       return;
@@ -247,7 +225,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     }
 
     // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*indexBuffer, commandBuffer, headset->getQueue()))
+    if (!stagingBuffer->copyTo(*indexBuffer, headset->getCommandBuffer(), headset->getDrawQueue()))
     {
       valid = false;
       return;
@@ -257,29 +235,15 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     stagingBuffer->destroy();
     delete stagingBuffer;
   }
-
-  // Create a memory fence
-  VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-  fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-  if (vkCreateFence(device, &fenceCreateInfo, nullptr, &fence) != VK_SUCCESS)
-  {
-    valid = false;
-    return;
-  }
 }
 
 void Renderer::destroy() const
 {
-  const VkDevice device = headset->getDevice();
-  vkDestroyFence(device, fence, nullptr);
-
   indexBuffer->destroy();
   delete indexBuffer;
 
   vertexBuffer->destroy();
   delete vertexBuffer;
-
-  vkDestroyCommandPool(device, commandPool, nullptr);
 
   cubePipeline->destroy();
   delete cubePipeline;
@@ -287,6 +251,7 @@ void Renderer::destroy() const
   gridPipeline->destroy();
   delete gridPipeline;
 
+  const VkDevice device = headset->getDevice();
   vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
   vkDestroyDescriptorPool(device, descriptorPool, nullptr);
   vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
@@ -297,17 +262,11 @@ void Renderer::destroy() const
 
 void Renderer::render(size_t swapchainImageIndex) const
 {
-  if (vkWaitForFences(headset->getDevice(), 1u, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
-  {
-    return;
-  }
-
   // Update the uniform buffer
   ubo.world = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, 0.0f });
   for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
   {
-    ubo.view[eyeIndex] = headset->getEyeViewMatrix(eyeIndex);
-    ubo.projection[eyeIndex] = headset->getEyeProjectionMatrix(eyeIndex);
+    ubo.viewProjection[eyeIndex] = headset->getEyeProjectionMatrix(eyeIndex) * headset->getEyeViewMatrix(eyeIndex);
   }
 
   void* data = uniformBuffer->map();
@@ -319,21 +278,7 @@ void Renderer::render(size_t swapchainImageIndex) const
   memcpy(data, &ubo, sizeof(ubo));
   uniformBuffer->unmap();
 
-  if (vkResetFences(headset->getDevice(), 1u, &fence) != VK_SUCCESS)
-  {
-    return;
-  }
-
-  if (vkResetCommandBuffer(commandBuffer, 0u) != VK_SUCCESS)
-  {
-    return;
-  }
-
-  VkCommandBufferBeginInfo commandBufferBeginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-  if (vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS)
-  {
-    return;
-  }
+  const VkCommandBuffer commandBuffer = headset->getCommandBuffer();
 
   const std::array clearValues = { VkClearValue({ 0.5f, 0.5f, 0.5f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
 
@@ -384,21 +329,6 @@ void Renderer::render(size_t swapchainImageIndex) const
   vkCmdDrawIndexed(commandBuffer, 30u, 1u, 6u, 0u, 0u);
 
   vkCmdEndRenderPass(commandBuffer);
-
-  if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
-  {
-    return;
-  }
-
-  const VkQueue queue = headset->getQueue();
-
-  VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
-  submitInfo.commandBufferCount = 1u;
-  submitInfo.pCommandBuffers = &commandBuffer;
-  if (vkQueueSubmit(queue, 1u, &submitInfo, fence) != VK_SUCCESS)
-  {
-    return;
-  }
 }
 
 bool Renderer::isValid() const

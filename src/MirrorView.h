@@ -24,7 +24,8 @@ public:
   void onWindowResize();
 
   void processWindowEvents() const;
-  void render(uint32_t swapchainImageIndex);
+  bool render(uint32_t swapchainImageIndex);
+  void present();
 
   Error getError() const;
   bool windowShouldClose() const;
@@ -35,14 +36,10 @@ private:
   const Headset* headset = nullptr;
   GLFWwindow* window = nullptr;
   VkSurfaceKHR surface = nullptr;
-  uint32_t drawQueueFamilyIndex = 0u, presentQueueFamilyIndex = 0u;
-  VkQueue drawQueue = nullptr, presentQueue = nullptr;
+  VkQueue presentQueue = nullptr;
   VkSwapchainKHR swapchain = nullptr;
   std::vector<VkImage> swapchainImages;
-  VkCommandPool commandPool = nullptr;
-  VkCommandBuffer commandBuffer = nullptr;
-  VkSemaphore imageAvailableSemaphore = nullptr, renderFinishedSemaphore = nullptr;
-  VkFence inFlightFence = nullptr;
+  uint32_t destinationImageIndex = 0u;
   VkExtent2D renderSize = { 0u, 0u };
   bool resizeDetected = false;
 
