@@ -12,7 +12,7 @@ public:
          VkDeviceSize size,
          const void* data = nullptr);
 
-  void destroy() const;
+  void destroy() const; // Only call when construction succeeded
 
   bool copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue queue) const;
   void* map() const;

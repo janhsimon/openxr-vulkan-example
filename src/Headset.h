@@ -10,6 +10,7 @@
 
 #include <vector>
 
+class Context;
 class RenderTarget;
 
 class Headset final
@@ -24,7 +25,7 @@ public:
     Vulkan
   };
 
-  Headset();
+  Headset(const Context* context, VkSurfaceKHR mirrorSurface);
 
   void sync() const;
   void destroy() const; // Only call when construction succeeded
@@ -41,11 +42,10 @@ public:
   void endFrame() const;
 
   Error getError() const;
-  VkInstance getInstance() const;
-  VkPhysicalDevice getPhysicalDevice() const;
   VkDevice getDevice() const;
   VkRenderPass getRenderPass() const;
   VkQueue getDrawQueue() const;
+  VkQueue getPresentQueue() const;
   VkCommandBuffer getCommandBuffer() const;
   VkSemaphore getImageAvailableSemaphore() const;
   VkSemaphore getRenderFinishedSemaphore() const;
@@ -58,6 +58,8 @@ public:
 private:
   Error error = Error::Success;
 
+  const Context* context = nullptr;
+
   size_t eyeCount = 0u;
   std::vector<glm::mat4> eyeViewMatrices;
   std::vector<glm::mat4> eyeProjectionMatrices;
@@ -66,13 +68,9 @@ private:
   struct
   {
     // Extension function pointers
-    PFN_xrGetVulkanInstanceExtensionsKHR getVulkanInstanceExtensionsKHR = nullptr;
     PFN_xrGetVulkanDeviceExtensionsKHR getVulkanDeviceExtensionsKHR = nullptr;
-    PFN_xrGetVulkanGraphicsDeviceKHR getVulkanGraphicsDeviceKHR = nullptr;
     PFN_xrGetVulkanGraphicsRequirementsKHR getVulkanGraphicsRequirementsKHR = nullptr;
 
-    XrInstance instance = nullptr;
-    XrSystemId systemId = 0u;
     XrSession session = nullptr;
     XrSessionState sessionState = XR_SESSION_STATE_UNKNOWN;
     XrSpace space = nullptr;
@@ -84,22 +82,14 @@ private:
     std::vector<XrCompositionLayerProjectionView> eyeRenderInfos;
     XrSwapchain swapchain = nullptr;
     std::vector<RenderTarget*> swapchainRenderTargets;
-
-#ifdef DEBUG
-    PFN_xrCreateDebugUtilsMessengerEXT createDebugUtilsMessengerEXT = nullptr;
-    PFN_xrDestroyDebugUtilsMessengerEXT destroyDebugUtilsMessengerEXT = nullptr;
-    XrDebugUtilsMessengerEXT debugUtilsMessenger = nullptr;
-#endif
   } xr;
 
   // Vulkan resources
   struct
   {
-    VkInstance instance = nullptr;
-    VkPhysicalDevice physicalDevice = nullptr;
-    uint32_t drawQueueFamilyIndex = 0u;
+    uint32_t drawQueueFamilyIndex = 0u, presentQueueFamilyIndex = 0u;
     VkDevice device = nullptr;
-    VkQueue drawQueue = nullptr;
+    VkQueue drawQueue = nullptr, presentQueue = nullptr;
     VkRenderPass renderPass = nullptr;
     VkImage depthImage = nullptr;
     VkDeviceMemory depthMemory = nullptr;
@@ -108,11 +98,9 @@ private:
     VkCommandBuffer commandBuffer = nullptr;
     VkSemaphore imageAvailableSemaphore = nullptr, renderFinishedSemaphore = nullptr;
     VkFence inFlightFence = nullptr;
-
-#ifdef DEBUG
-    PFN_vkCreateDebugUtilsMessengerEXT createDebugUtilsMessengerEXT = nullptr;
-    PFN_vkDestroyDebugUtilsMessengerEXT destroyDebugUtilsMessengerEXT = nullptr;
-    VkDebugUtilsMessengerEXT debugUtilsMessenger = nullptr;
-#endif
   } vk;
+
+  bool onSessionStateReady() const;
+  bool onSessionStateStopping() const;
+  bool onSessionStateExiting() const;
 };

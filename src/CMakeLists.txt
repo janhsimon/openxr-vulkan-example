@@ -13,6 +13,9 @@ set(SRC
   Buffer.cpp
   Buffer.h
 
+  Context.cpp
+  Context.h
+
   Headset.cpp
   Headset.h
 
@@ -27,6 +30,9 @@ set(SRC
 
   RenderTarget.cpp
   RenderTarget.h
+
+  Util.cpp
+  Util.h
 
   ${SHADER_SRC}
 )

@@ -54,12 +54,12 @@ struct UniformBufferObject final
 } ubo;
 } // namespace
 
-Renderer::Renderer(const Headset* headset) : headset(headset)
+Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : headset(headset)
 {
   const VkDevice device = headset->getDevice();
 
   // Create an empty uniform buffer
-  uniformBuffer = new Buffer(device, headset->getPhysicalDevice(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+  uniformBuffer = new Buffer(device, physicalDevice, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                              static_cast<VkDeviceSize>(sizeof(UniformBufferObject)));
 
@@ -170,7 +170,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   {
     // Create a staging buffer and fill it with the vertex data
     constexpr size_t size = sizeof(vertices);
-    Buffer* stagingBuffer = new Buffer(device, headset->getPhysicalDevice(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    Buffer* stagingBuffer = new Buffer(device, physicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        static_cast<VkDeviceSize>(size), static_cast<const void*>(vertices.data()));
     if (!stagingBuffer->isValid())
@@ -180,9 +180,9 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     }
 
     // Create an empty target buffer
-    vertexBuffer = new Buffer(device, headset->getPhysicalDevice(),
-                              VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
+    vertexBuffer =
+      new Buffer(device, physicalDevice, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
     if (!vertexBuffer->isValid())
     {
       valid = false;
@@ -205,7 +205,7 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
   {
     // Create a staging buffer and fill it with the index data
     constexpr size_t size = sizeof(indices);
-    Buffer* stagingBuffer = new Buffer(device, headset->getPhysicalDevice(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    Buffer* stagingBuffer = new Buffer(device, physicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        static_cast<VkDeviceSize>(size), static_cast<const void*>(indices.data()));
     if (!stagingBuffer->isValid())
@@ -215,9 +215,9 @@ Renderer::Renderer(const Headset* headset) : headset(headset)
     }
 
     // Create an empty target buffer
-    indexBuffer = new Buffer(device, headset->getPhysicalDevice(),
-                             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
+    indexBuffer =
+      new Buffer(device, physicalDevice, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
     if (!indexBuffer->isValid())
     {
       valid = false;

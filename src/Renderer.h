@@ -9,7 +9,7 @@ class Pipeline;
 class Renderer final
 {
 public:
-  Renderer(const Headset* headset);
+  Renderer(const Headset* headset, VkPhysicalDevice physicalDevice);
 
   void destroy() const; // Only call when construction succeeded
 

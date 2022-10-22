@@ -1,5 +1,6 @@
 #include "MirrorView.h"
 
+#include "Context.h"
 #include "Headset.h"
 #include "RenderTarget.h"
 
@@ -19,7 +20,7 @@ void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 }
 } // namespace
 
-MirrorView::MirrorView(const Headset* headset) : headset(headset)
+MirrorView::MirrorView(const Context* context) : context(context)
 {
   // Create a fullscreen window
   GLFWmonitor* monitor = glfwGetPrimaryMonitor();
@@ -46,69 +47,10 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
   glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
   // Create a surface for the window
-  VkResult result = glfwCreateWindowSurface(headset->getInstance(), window, nullptr, &surface);
+  VkResult result = glfwCreateWindowSurface(context->getVkInstance(), window, nullptr, &surface);
   if (result != VK_SUCCESS)
   {
     error = Error::GLFW;
-    return;
-  }
-
-  // Pick the present queue family index
-  uint32_t presentQueueFamilyIndex;
-  {
-    VkPhysicalDevice physicalDevice = headset->getPhysicalDevice();
-
-    // Retrieve the queue families
-    std::vector<VkQueueFamilyProperties> queueFamilies;
-    uint32_t queueFamilyCount = 0u;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
-
-    queueFamilies.resize(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
-
-    bool presentQueueFamilyIndexFound = false;
-    for (size_t queueFamilyIndexCandidate = 0u; queueFamilyIndexCandidate < queueFamilies.size();
-         ++queueFamilyIndexCandidate)
-    {
-      const VkQueueFamilyProperties& queueFamilyCandidate = queueFamilies.at(queueFamilyIndexCandidate);
-
-      // Check that the queue family includes actual queues
-      if (queueFamilyCandidate.queueCount == 0u)
-      {
-        continue;
-      }
-
-      // Check the queue family for presenting support
-      VkBool32 presentSupport = false;
-      if (vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, static_cast<uint32_t>(queueFamilyIndexCandidate),
-                                               surface, &presentSupport) != VK_SUCCESS)
-      {
-        error = Error::Vulkan;
-        return;
-      }
-
-      if (!presentQueueFamilyIndexFound && presentSupport)
-      {
-        presentQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
-        presentQueueFamilyIndexFound = true;
-        break;
-      }
-    }
-
-    if (!presentQueueFamilyIndexFound)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-  }
-
-  // Retrieve the present queue
-  vkGetDeviceQueue(headset->getDevice(), presentQueueFamilyIndex, 0u, &presentQueue);
-
-  // Create a swapchain and render targets
-  if (!recreateSwapchain())
-  {
-    error = Error::Vulkan;
     return;
   }
 }
@@ -116,7 +58,7 @@ MirrorView::MirrorView(const Headset* headset) : headset(headset)
 void MirrorView::destroy() const
 {
   vkDestroySwapchainKHR(headset->getDevice(), swapchain, nullptr);
-  vkDestroySurfaceKHR(headset->getInstance(), surface, nullptr);
+  vkDestroySurfaceKHR(context->getVkInstance(), surface, nullptr);
 
   glfwDestroyWindow(window);
   glfwTerminate();
@@ -125,6 +67,12 @@ void MirrorView::destroy() const
 void MirrorView::onWindowResize()
 {
   resizeDetected = true;
+}
+
+bool MirrorView::mirrorHeadset(const Headset* headset)
+{
+  this->headset = headset;
+  return recreateSwapchain();
 }
 
 void MirrorView::processWindowEvents() const
@@ -258,7 +206,7 @@ void MirrorView::present()
   presentInfo.pSwapchains = &swapchain;
   presentInfo.pImageIndices = &destinationImageIndex;
 
-  const VkResult result = vkQueuePresentKHR(presentQueue, &presentInfo);
+  const VkResult result = vkQueuePresentKHR(headset->getPresentQueue(), &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
   {
     // Recreate the swapchain for the next frame if necessary
@@ -283,12 +231,17 @@ bool MirrorView::windowShouldClose() const
   return glfwWindowShouldClose(window);
 }
 
+VkSurfaceKHR MirrorView::getSurface() const
+{
+  return surface;
+}
+
 bool MirrorView::recreateSwapchain()
 {
   const VkDevice device = headset->getDevice();
   vkDeviceWaitIdle(device);
 
-  const VkPhysicalDevice physicalDevice = headset->getPhysicalDevice();
+  const VkPhysicalDevice physicalDevice = context->getVkPhysicalDevice();
 
   // Get the surface capabilities and extent
   VkSurfaceCapabilitiesKHR surfaceCapabilities;

@@ -1,38 +1,8 @@
 #include "Pipeline.h"
 
+#include "Util.h"
+
 #include <array>
-#include <fstream>
-
-namespace
-{
-bool loadShaderFromFile(VkDevice device, const std::string& filename, VkShaderModule& shaderModule)
-{
-  std::ifstream file(filename, std::ios::ate | std::ios::binary);
-  if (!file.is_open())
-  {
-    return false;
-  }
-
-  const size_t fileSize = static_cast<size_t>(file.tellg());
-  std::vector<char> code(fileSize);
-  file.seekg(0);
-  file.read(code.data(), fileSize);
-  file.close();
-
-  VkShaderModuleCreateInfo shaderModuleCreateInfo;
-  shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  shaderModuleCreateInfo.pNext = nullptr;
-  shaderModuleCreateInfo.flags = 0u;
-  shaderModuleCreateInfo.codeSize = code.size();
-  shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-  if (vkCreateShaderModule(device, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS)
-  {
-    return false;
-  }
-
-  return true;
-}
-} // namespace
 
 Pipeline::Pipeline(VkDevice device,
                    VkPipelineLayout pipelineLayout,
@@ -44,14 +14,14 @@ Pipeline::Pipeline(VkDevice device,
 : device(device)
 {
   VkShaderModule vertexShaderModule;
-  if (!loadShaderFromFile(device, vertexFilename, vertexShaderModule))
+  if (!util::loadShaderFromFile(device, vertexFilename, vertexShaderModule))
   {
     valid = false;
     return;
   }
 
   VkShaderModule fragmentShaderModule;
-  if (!loadShaderFromFile(device, fragmentFilename, fragmentShaderModule))
+  if (!util::loadShaderFromFile(device, fragmentFilename, fragmentShaderModule))
   {
     valid = false;
     return;

@@ -32,7 +32,7 @@ RenderTarget::RenderTarget(VkDevice device,
   std::vector<VkImageView> attachments = { imageView };
   if (depthImageView)
   {
-    attachments.emplace_back(depthImageView);
+    attachments.push_back(depthImageView);
   }
 
   // Create a framebuffer
