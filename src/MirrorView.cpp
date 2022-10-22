@@ -18,6 +18,14 @@ void framebufferSizeCallback(GLFWwindow* window, int width, int height)
   MirrorView* mirrorView = reinterpret_cast<MirrorView*>(glfwGetWindowUserPointer(window));
   mirrorView->onWindowResize();
 }
+
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+  if (action == GLFW_RELEASE && key == GLFW_KEY_ESCAPE)
+  {
+    glfwSetWindowShouldClose(window, 1);
+  }
+}
 } // namespace
 
 MirrorView::MirrorView(const Context* context) : context(context)
@@ -45,6 +53,7 @@ MirrorView::MirrorView(const Context* context) : context(context)
 
   glfwSetWindowUserPointer(window, this);
   glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+  glfwSetKeyCallback(window, keyCallback);
 
   // Create a surface for the window
   VkResult result = glfwCreateWindowSurface(context->getVkInstance(), window, nullptr, &surface);
@@ -228,7 +237,7 @@ MirrorView::Error MirrorView::getError() const
 
 bool MirrorView::windowShouldClose() const
 {
-  return glfwWindowShouldClose(window);
+  return static_cast<bool>(glfwWindowShouldClose(window));
 }
 
 VkSurfaceKHR MirrorView::getSurface() const
