@@ -19,7 +19,7 @@ public:
   void unmap() const;
 
   bool isValid() const;
-  VkBuffer getBuffer() const;
+  VkBuffer getVkBuffer() const;
 
 private:
   bool valid = true;

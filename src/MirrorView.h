@@ -40,12 +40,15 @@ private:
   const Context* context = nullptr;
   const Headset* headset = nullptr;
   const Renderer* renderer = nullptr;
+
   GLFWwindow* window = nullptr;
+
   VkSurfaceKHR surface = nullptr;
   VkSwapchainKHR swapchain = nullptr;
   std::vector<VkImage> swapchainImages;
-  uint32_t destinationImageIndex = 0u;
   VkExtent2D renderSize = { 0u, 0u };
+
+  uint32_t destinationImageIndex = 0u;
   bool resizeDetected = false;
 
   bool recreateSwapchain();

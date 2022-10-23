@@ -2,11 +2,11 @@
 
 #include <cstring>
 
-Buffer::Buffer(VkDevice device,
-               VkPhysicalDevice physicalDevice,
-               VkBufferUsageFlags bufferUsageFlags,
-               VkMemoryPropertyFlags memoryProperties,
-               VkDeviceSize size,
+Buffer::Buffer(const VkDevice device,
+               const VkPhysicalDevice physicalDevice,
+               const VkBufferUsageFlags bufferUsageFlags,
+               const VkMemoryPropertyFlags memoryProperties,
+               const VkDeviceSize size,
                const void* data)
 : device(device), size(size)
 {
@@ -93,7 +93,7 @@ bool Buffer::copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue
 
   VkBufferCopy copyRegion{};
   copyRegion.size = size;
-  vkCmdCopyBuffer(commandBuffer, buffer, target.getBuffer(), 1u, &copyRegion);
+  vkCmdCopyBuffer(commandBuffer, buffer, target.getVkBuffer(), 1u, &copyRegion);
 
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
   {
@@ -138,7 +138,7 @@ bool Buffer::isValid() const
   return valid;
 }
 
-VkBuffer Buffer::getBuffer() const
+VkBuffer Buffer::getVkBuffer() const
 {
   return buffer;
 }

@@ -97,7 +97,7 @@ Context::Context()
     instanceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     instanceCreateInfo.enabledExtensionNames = extensions.data();
     instanceCreateInfo.applicationInfo = applicationInfo;
-    const XrResult result = xrCreateInstance(&instanceCreateInfo, &xr.instance);
+    const XrResult result = xrCreateInstance(&instanceCreateInfo, &xrInstance);
     if (XR_FAILED(result))
     {
       error = Error::NoHeadsetDetected;
@@ -106,29 +106,29 @@ Context::Context()
   }
 
   // Load the required OpenXR extension functions
-  if (!util::loadXrExtensionFunction(xr.instance, "xrGetVulkanInstanceExtensionsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanInstanceExtensionsKHR)))
+  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanInstanceExtensionsKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanInstanceExtensionsKHR)))
   {
     error = Error::OpenXR;
     return;
   }
 
-  if (!util::loadXrExtensionFunction(xr.instance, "xrGetVulkanGraphicsDeviceKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanGraphicsDeviceKHR)))
+  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanGraphicsDeviceKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsDeviceKHR)))
   {
     error = Error::OpenXR;
     return;
   }
 
-  if (!util::loadXrExtensionFunction(xr.instance, "xrGetVulkanDeviceExtensionsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanDeviceExtensionsKHR)))
+  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanDeviceExtensionsKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanDeviceExtensionsKHR)))
   {
     error = Error::OpenXR;
     return;
   }
 
-  if (!util::loadXrExtensionFunction(xr.instance, "xrGetVulkanGraphicsRequirementsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanGraphicsRequirementsKHR)))
+  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanGraphicsRequirementsKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsRequirementsKHR)))
   {
     error = Error::OpenXR;
     return;
@@ -137,15 +137,15 @@ Context::Context()
 #ifdef DEBUG
   // Create an OpenXR debug utils messenger for validation
   {
-    if (!util::loadXrExtensionFunction(xr.instance, "xrCreateDebugUtilsMessengerEXT",
-                                       reinterpret_cast<PFN_xrVoidFunction*>(&xr.createDebugUtilsMessengerEXT)))
+    if (!util::loadXrExtensionFunction(xrInstance, "xrCreateDebugUtilsMessengerEXT",
+                                       reinterpret_cast<PFN_xrVoidFunction*>(&xrCreateDebugUtilsMessengerEXT)))
     {
       error = Error::OpenXR;
       return;
     }
 
-    if (!util::loadXrExtensionFunction(xr.instance, "xrDestroyDebugUtilsMessengerEXT",
-                                       reinterpret_cast<PFN_xrVoidFunction*>(&xr.destroyDebugUtilsMessengerEXT)))
+    if (!util::loadXrExtensionFunction(xrInstance, "xrDestroyDebugUtilsMessengerEXT",
+                                       reinterpret_cast<PFN_xrVoidFunction*>(&xrDestroyDebugUtilsMessengerEXT)))
     {
       error = Error::OpenXR;
       return;
@@ -176,7 +176,7 @@ Context::Context()
     debugUtilsMessengerCreateInfo.messageSeverities = severityFlags;
     debugUtilsMessengerCreateInfo.userCallback = callback;
     const XrResult result =
-      xr.createDebugUtilsMessengerEXT(xr.instance, &debugUtilsMessengerCreateInfo, &xr.debugUtilsMessenger);
+      xrCreateDebugUtilsMessengerEXT(xrInstance, &debugUtilsMessengerCreateInfo, &xrDebugUtilsMessenger);
     if (XR_FAILED(result))
     {
       error = Error::OpenXR;
@@ -188,7 +188,7 @@ Context::Context()
   // Get the system ID
   XrSystemGetInfo systemGetInfo{ XR_TYPE_SYSTEM_GET_INFO };
   systemGetInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-  XrResult result = xrGetSystem(xr.instance, &systemGetInfo, &xr.systemId);
+  XrResult result = xrGetSystem(xrInstance, &systemGetInfo, &systemId);
   if (XR_FAILED(result))
   {
     error = Error::NoHeadsetDetected;
@@ -198,8 +198,7 @@ Context::Context()
   // Check the supported environment blend modes
   {
     uint32_t environmentBlendModeCount;
-    result =
-      xrEnumerateEnvironmentBlendModes(xr.instance, xr.systemId, viewType, 0u, &environmentBlendModeCount, nullptr);
+    result = xrEnumerateEnvironmentBlendModes(xrInstance, systemId, viewType, 0u, &environmentBlendModeCount, nullptr);
     if (XR_FAILED(result))
     {
       error = Error::OpenXR;
@@ -207,7 +206,7 @@ Context::Context()
     }
 
     std::vector<XrEnvironmentBlendMode> supportedEnvironmentBlendModes(environmentBlendModeCount);
-    result = xrEnumerateEnvironmentBlendModes(xr.instance, xr.systemId, viewType, environmentBlendModeCount,
+    result = xrEnumerateEnvironmentBlendModes(xrInstance, systemId, viewType, environmentBlendModeCount,
                                               &environmentBlendModeCount, supportedEnvironmentBlendModes.data());
     if (XR_FAILED(result))
     {
@@ -271,7 +270,7 @@ Context::Context()
   // Get the required Vulkan instance extensions from OpenXR and add them
   {
     uint32_t count;
-    result = xr.getVulkanInstanceExtensionsKHR(xr.instance, xr.systemId, 0u, &count, nullptr);
+    result = xrGetVulkanInstanceExtensionsKHR(xrInstance, systemId, 0u, &count, nullptr);
     if (XR_FAILED(result))
     {
       error = Error::OpenXR;
@@ -280,7 +279,7 @@ Context::Context()
 
     std::string buffer;
     buffer.resize(count);
-    result = xr.getVulkanInstanceExtensionsKHR(xr.instance, xr.systemId, count, &count, buffer.data());
+    result = xrGetVulkanInstanceExtensionsKHR(xrInstance, systemId, count, &count, buffer.data());
     if (XR_FAILED(result))
     {
       error = Error::OpenXR;
@@ -377,7 +376,7 @@ Context::Context()
     instanceCreateInfo.ppEnabledLayerNames = layers.data();
 #endif
 
-    if (vkCreateInstance(&instanceCreateInfo, nullptr, &vk.instance) != VK_SUCCESS)
+    if (vkCreateInstance(&instanceCreateInfo, nullptr, &vkInstance) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
@@ -387,17 +386,17 @@ Context::Context()
 #ifdef DEBUG
   // Create a Vulkan debug utils messenger for validation
   {
-    vk.createDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
-      util::loadVkExtensionFunction(vk.instance, "vkCreateDebugUtilsMessengerEXT"));
-    if (!vk.createDebugUtilsMessengerEXT)
+    vkCreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+      util::loadVkExtensionFunction(vkInstance, "vkCreateDebugUtilsMessengerEXT"));
+    if (!vkCreateDebugUtilsMessengerEXT)
     {
       error = Error::Vulkan;
       return;
     }
 
-    vk.destroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-      util::loadVkExtensionFunction(vk.instance, "vkDestroyDebugUtilsMessengerEXT"));
-    if (!vk.destroyDebugUtilsMessengerEXT)
+    vkDestroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+      util::loadVkExtensionFunction(vkInstance, "vkDestroyDebugUtilsMessengerEXT"));
+    if (!vkDestroyDebugUtilsMessengerEXT)
     {
       error = Error::Vulkan;
       return;
@@ -429,8 +428,8 @@ Context::Context()
     debugUtilsMessengerCreateInfo.messageType = typeFlags;
     debugUtilsMessengerCreateInfo.messageSeverity = severityFlags;
     debugUtilsMessengerCreateInfo.pfnUserCallback = callback;
-    if (vk.createDebugUtilsMessengerEXT(vk.instance, &debugUtilsMessengerCreateInfo, nullptr,
-                                        &vk.debugUtilsMessenger) != VK_SUCCESS)
+    if (vkCreateDebugUtilsMessengerEXT(vkInstance, &debugUtilsMessengerCreateInfo, nullptr, &vkDebugUtilsMessenger) !=
+        VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
@@ -442,7 +441,7 @@ Context::Context()
 bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 {
   // Retrieve the physical device from OpenXR
-  XrResult result = xr.getVulkanGraphicsDeviceKHR(xr.instance, xr.systemId, vk.instance, &vk.physicalDevice);
+  XrResult result = xrGetVulkanGraphicsDeviceKHR(xrInstance, systemId, vkInstance, &physicalDevice);
   if (XR_FAILED(result))
   {
     return false;
@@ -453,10 +452,10 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     // Retrieve the queue families
     std::vector<VkQueueFamilyProperties> queueFamilies;
     uint32_t queueFamilyCount;
-    vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, nullptr);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
 
     queueFamilies.resize(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, queueFamilies.data());
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
     bool drawQueueFamilyIndexFound = false;
     for (size_t queueFamilyIndexCandidate = 0u; queueFamilyIndexCandidate < queueFamilies.size();
@@ -473,7 +472,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
       // Check the queue family for drawing support
       if (queueFamilyCandidate.queueFlags & VK_QUEUE_GRAPHICS_BIT)
       {
-        vk.drawQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
+        drawQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
         drawQueueFamilyIndexFound = true;
         break;
       }
@@ -490,10 +489,10 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     // Retrieve the queue families
     std::vector<VkQueueFamilyProperties> queueFamilies;
     uint32_t queueFamilyCount = 0u;
-    vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, nullptr);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
 
     queueFamilies.resize(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, queueFamilies.data());
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
     bool presentQueueFamilyIndexFound = false;
     for (size_t queueFamilyIndexCandidate = 0u; queueFamilyIndexCandidate < queueFamilies.size();
@@ -509,7 +508,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 
       // Check the queue family for presenting support
       VkBool32 presentSupport = false;
-      if (vkGetPhysicalDeviceSurfaceSupportKHR(vk.physicalDevice, static_cast<uint32_t>(queueFamilyIndexCandidate),
+      if (vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, static_cast<uint32_t>(queueFamilyIndexCandidate),
                                                mirrorSurface, &presentSupport) != VK_SUCCESS)
       {
         return false;
@@ -517,7 +516,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 
       if (!presentQueueFamilyIndexFound && presentSupport)
       {
-        vk.presentQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
+        presentQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
         presentQueueFamilyIndexFound = true;
         break;
       }
@@ -533,13 +532,13 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
   std::vector<VkExtensionProperties> supportedVulkanDeviceExtensions;
   {
     uint32_t deviceExtensionCount;
-    if (vkEnumerateDeviceExtensionProperties(vk.physicalDevice, nullptr, &deviceExtensionCount, nullptr) != VK_SUCCESS)
+    if (vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionCount, nullptr) != VK_SUCCESS)
     {
       return false;
     }
 
     supportedVulkanDeviceExtensions.resize(deviceExtensionCount);
-    if (vkEnumerateDeviceExtensionProperties(vk.physicalDevice, nullptr, &deviceExtensionCount,
+    if (vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionCount,
                                              supportedVulkanDeviceExtensions.data()) != VK_SUCCESS)
     {
       return false;
@@ -547,13 +546,13 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
   }
 
   // Load the required OpenXR extension functions
-  if (!util::loadXrExtensionFunction(xr.instance, "xrGetVulkanDeviceExtensionsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanDeviceExtensionsKHR)))
+  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanDeviceExtensionsKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanDeviceExtensionsKHR)))
   {
     return false;
   }
-  if (!util::loadXrExtensionFunction(xr.instance, "xrGetVulkanGraphicsRequirementsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanGraphicsRequirementsKHR)))
+  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanGraphicsRequirementsKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsRequirementsKHR)))
   {
     return false;
   }
@@ -562,7 +561,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
   std::vector<const char*> vulkanDeviceExtensions;
   {
     uint32_t count;
-    result = xr.getVulkanDeviceExtensionsKHR(xr.instance, xr.systemId, 0u, &count, nullptr);
+    result = xrGetVulkanDeviceExtensionsKHR(xrInstance, systemId, 0u, &count, nullptr);
     if (XR_FAILED(result))
     {
       return false;
@@ -570,7 +569,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 
     std::string buffer;
     buffer.resize(count);
-    result = xr.getVulkanDeviceExtensionsKHR(xr.instance, xr.systemId, count, &count, buffer.data());
+    result = xrGetVulkanDeviceExtensionsKHR(xrInstance, systemId, count, &count, buffer.data());
     if (XR_FAILED(result))
     {
       return false;
@@ -607,7 +606,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
   {
     // Verify that the required physical device features are supported
     VkPhysicalDeviceFeatures physicalDeviceFeatures;
-    vkGetPhysicalDeviceFeatures(vk.physicalDevice, &physicalDeviceFeatures);
+    vkGetPhysicalDeviceFeatures(physicalDevice, &physicalDeviceFeatures);
     if (!physicalDeviceFeatures.shaderStorageImageMultisample)
     {
       return false;
@@ -618,7 +617,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES
     };
     physicalDeviceFeatures2.pNext = &physicalDeviceMultiviewFeatures;
-    vkGetPhysicalDeviceFeatures2(vk.physicalDevice, &physicalDeviceFeatures2);
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &physicalDeviceFeatures2);
     if (!physicalDeviceMultiviewFeatures.multiview)
     {
       return false;
@@ -632,14 +631,14 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     std::vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos;
 
     VkDeviceQueueCreateInfo deviceQueueCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-    deviceQueueCreateInfo.queueFamilyIndex = vk.drawQueueFamilyIndex;
+    deviceQueueCreateInfo.queueFamilyIndex = drawQueueFamilyIndex;
     deviceQueueCreateInfo.queueCount = 1u;
     deviceQueueCreateInfo.pQueuePriorities = &queuePriority;
     deviceQueueCreateInfos.push_back(deviceQueueCreateInfo);
 
-    if (vk.drawQueueFamilyIndex != vk.presentQueueFamilyIndex)
+    if (drawQueueFamilyIndex != presentQueueFamilyIndex)
     {
-      deviceQueueCreateInfo.queueFamilyIndex = vk.presentQueueFamilyIndex;
+      deviceQueueCreateInfo.queueFamilyIndex = presentQueueFamilyIndex;
       deviceQueueCreateInfos.push_back(deviceQueueCreateInfo);
     }
 
@@ -650,7 +649,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
     deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(deviceQueueCreateInfos.size());
     deviceCreateInfo.pQueueCreateInfos = deviceQueueCreateInfos.data();
-    if (vkCreateDevice(vk.physicalDevice, &deviceCreateInfo, nullptr, &vk.device) != VK_SUCCESS)
+    if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS)
     {
       return false;
     }
@@ -658,21 +657,21 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 
   // Check the graphics requirements for Vulkan
   XrGraphicsRequirementsVulkanKHR graphicsRequirements{ XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR };
-  result = xr.getVulkanGraphicsRequirementsKHR(xr.instance, xr.systemId, &graphicsRequirements);
+  result = xrGetVulkanGraphicsRequirementsKHR(xrInstance, systemId, &graphicsRequirements);
   if (XR_FAILED(result))
   {
     return false;
   }
 
   // Retrieve the queues
-  vkGetDeviceQueue(vk.device, vk.drawQueueFamilyIndex, 0u, &vk.drawQueue);
-  if (!vk.drawQueue)
+  vkGetDeviceQueue(device, drawQueueFamilyIndex, 0u, &drawQueue);
+  if (!drawQueue)
   {
     return false;
   }
 
-  vkGetDeviceQueue(vk.device, vk.presentQueueFamilyIndex, 0u, &vk.presentQueue);
-  if (!vk.presentQueue)
+  vkGetDeviceQueue(device, presentQueueFamilyIndex, 0u, &presentQueue);
+  if (!presentQueue)
   {
     return false;
   }
@@ -682,26 +681,26 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 
 void Context::sync() const
 {
-  vkDeviceWaitIdle(vk.device);
+  vkDeviceWaitIdle(device);
 }
 
 void Context::destroy() const
 {
   // Clean up OpenXR
 #ifdef DEBUG
-  xr.destroyDebugUtilsMessengerEXT(xr.debugUtilsMessenger);
+  xrDestroyDebugUtilsMessengerEXT(xrDebugUtilsMessenger);
 #endif
 
-  xrDestroyInstance(xr.instance);
+  xrDestroyInstance(xrInstance);
 
   // Clean up Vulkan
-  vkDestroyDevice(vk.device, nullptr);
+  vkDestroyDevice(device, nullptr);
 
 #ifdef DEBUG
-  vk.destroyDebugUtilsMessengerEXT(vk.instance, vk.debugUtilsMessenger, nullptr);
+  vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugUtilsMessenger, nullptr);
 #endif
 
-  vkDestroyInstance(vk.instance, nullptr);
+  vkDestroyInstance(vkInstance, nullptr);
 }
 
 Context::Error Context::getError() const
@@ -716,40 +715,40 @@ XrViewConfigurationType Context::getXrViewType() const
 
 XrInstance Context::getXrInstance() const
 {
-  return xr.instance;
+  return xrInstance;
 }
 
 XrSystemId Context::getXrSystemId() const
 {
-  return xr.systemId;
+  return systemId;
 }
 
 VkInstance Context::getVkInstance() const
 {
-  return vk.instance;
+  return vkInstance;
 }
 
 VkPhysicalDevice Context::getVkPhysicalDevice() const
 {
-  return vk.physicalDevice;
+  return physicalDevice;
 }
 
 uint32_t Context::getVkDrawQueueFamilyIndex() const
 {
-  return vk.drawQueueFamilyIndex;
+  return drawQueueFamilyIndex;
 }
 
 VkDevice Context::getVkDevice() const
 {
-  return vk.device;
+  return device;
 }
 
 VkQueue Context::getVkDrawQueue() const
 {
-  return vk.drawQueue;
+  return drawQueue;
 }
 
 VkQueue Context::getVkPresentQueue() const
 {
-  return vk.presentQueue;
+  return presentQueue;
 }

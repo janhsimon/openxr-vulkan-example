@@ -153,7 +153,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   }
 
   VkDescriptorBufferInfo descriptorBufferInfo;
-  descriptorBufferInfo.buffer = uniformBuffer->getBuffer();
+  descriptorBufferInfo.buffer = uniformBuffer->getVkBuffer();
   descriptorBufferInfo.offset = 0u;
   descriptorBufferInfo.range = VK_WHOLE_SIZE;
 
@@ -377,11 +377,11 @@ void Renderer::render(size_t swapchainImageIndex) const
 
   // Bind the vertex buffer
   const VkDeviceSize offset = 0u;
-  const VkBuffer buffer = vertexBuffer->getBuffer();
+  const VkBuffer buffer = vertexBuffer->getVkBuffer();
   vkCmdBindVertexBuffers(commandBuffer, 0u, 1u, &buffer, &offset);
 
   // Bind the index buffer
-  vkCmdBindIndexBuffer(commandBuffer, indexBuffer->getBuffer(), 0u, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(commandBuffer, indexBuffer->getVkBuffer(), 0u, VK_INDEX_TYPE_UINT16);
 
   // Bind the uniform buffer
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0u, 1u, &descriptorSet, 0u,
@@ -405,7 +405,7 @@ void Renderer::submit() const
     return;
   }
 
-  VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+  const VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
   VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
   submitInfo.waitSemaphoreCount = 1u;

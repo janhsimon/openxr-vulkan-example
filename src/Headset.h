@@ -54,32 +54,25 @@ private:
   std::vector<glm::mat4> eyeViewMatrices;
   std::vector<glm::mat4> eyeProjectionMatrices;
 
-  // OpenXR resources
-  struct
-  {
-    XrSession session = nullptr;
-    XrSessionState sessionState = XR_SESSION_STATE_UNKNOWN;
-    XrSpace space = nullptr;
-    XrFrameState frameState = {};
-    XrViewState viewState = {};
+  XrSession session = nullptr;
+  XrSessionState sessionState = XR_SESSION_STATE_UNKNOWN;
+  XrSpace space = nullptr;
+  XrFrameState frameState = {};
+  XrViewState viewState = {};
 
-    std::vector<XrViewConfigurationView> eyeImageInfos;
-    std::vector<XrView> eyePoses;
-    std::vector<XrCompositionLayerProjectionView> eyeRenderInfos;
-    XrSwapchain swapchain = nullptr;
-    std::vector<RenderTarget*> swapchainRenderTargets;
-  } xr;
+  std::vector<XrViewConfigurationView> eyeImageInfos;
+  std::vector<XrView> eyePoses;
+  std::vector<XrCompositionLayerProjectionView> eyeRenderInfos;
 
-  // Vulkan resources
-  struct
-  {
-    VkRenderPass renderPass = nullptr;
+  XrSwapchain swapchain = nullptr;
+  std::vector<RenderTarget*> swapchainRenderTargets;
 
-    // Depth buffer
-    VkImage depthImage = nullptr;
-    VkDeviceMemory depthMemory = nullptr;
-    VkImageView depthImageView = nullptr;
-  } vk;
+  VkRenderPass renderPass = nullptr;
+
+  // Depth buffer
+  VkImage depthImage = nullptr;
+  VkDeviceMemory depthMemory = nullptr;
+  VkImageView depthImageView = nullptr;
 
   bool onSessionStateReady() const;
   bool onSessionStateStopping() const;

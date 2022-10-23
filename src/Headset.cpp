@@ -15,10 +15,7 @@ inline constexpr VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 
 Headset::Headset(const Context* context) : context(context)
 {
-  const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
-  const VkDevice vkDevice = context->getVkDevice();
-  const XrInstance xrInstance = context->getXrInstance();
-  const XrSystemId xrSystemId = context->getXrSystemId();
+  const VkDevice device = context->getVkDevice();
 
   // Create a render pass
   {
@@ -75,18 +72,21 @@ Headset::Headset(const Context* context) : context(context)
     renderPassCreateInfo.pAttachments = attachments.data();
     renderPassCreateInfo.subpassCount = 1u;
     renderPassCreateInfo.pSubpasses = &subpassDescription;
-    if (vkCreateRenderPass(vkDevice, &renderPassCreateInfo, nullptr, &vk.renderPass) != VK_SUCCESS)
+    if (vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
     }
   }
 
+  const XrInstance xrInstance = context->getXrInstance();
+  const XrSystemId xrSystemId = context->getXrSystemId();
+  const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   const uint32_t vkDrawQueueFamilyIndex = context->getVkDrawQueueFamilyIndex();
 
   // Create a session with Vulkan graphics binding
   XrGraphicsBindingVulkanKHR graphicsBinding{ XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR };
-  graphicsBinding.device = vkDevice;
+  graphicsBinding.device = device;
   graphicsBinding.instance = context->getVkInstance();
   graphicsBinding.physicalDevice = vkPhysicalDevice;
   graphicsBinding.queueFamilyIndex = vkDrawQueueFamilyIndex;
@@ -95,7 +95,7 @@ Headset::Headset(const Context* context) : context(context)
   XrSessionCreateInfo sessionCreateInfo{ XR_TYPE_SESSION_CREATE_INFO };
   sessionCreateInfo.next = &graphicsBinding;
   sessionCreateInfo.systemId = xrSystemId;
-  XrResult result = xrCreateSession(xrInstance, &sessionCreateInfo, &xr.session);
+  XrResult result = xrCreateSession(xrInstance, &sessionCreateInfo, &session);
   if (XR_FAILED(result))
   {
     error = Error::OpenXR;
@@ -106,7 +106,7 @@ Headset::Headset(const Context* context) : context(context)
   XrReferenceSpaceCreateInfo referenceSpaceCreateInfo{ XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
   referenceSpaceCreateInfo.referenceSpaceType = spaceType;
   referenceSpaceCreateInfo.poseInReferenceSpace = util::makeIdentity();
-  result = xrCreateReferenceSpace(xr.session, &referenceSpaceCreateInfo, &xr.space);
+  result = xrCreateReferenceSpace(session, &referenceSpaceCreateInfo, &space);
   if (XR_FAILED(result))
   {
     error = Error::OpenXR;
@@ -125,16 +125,16 @@ Headset::Headset(const Context* context) : context(context)
   }
 
   // Get the eye image info per eye
-  xr.eyeImageInfos.resize(eyeCount);
-  for (XrViewConfigurationView& eyeInfo : xr.eyeImageInfos)
+  eyeImageInfos.resize(eyeCount);
+  for (XrViewConfigurationView& eyeInfo : eyeImageInfos)
   {
     eyeInfo.type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
     eyeInfo.next = nullptr;
   }
 
   result =
-    xrEnumerateViewConfigurationViews(xrInstance, xrSystemId, viewType, static_cast<uint32_t>(xr.eyeImageInfos.size()),
-                                      reinterpret_cast<uint32_t*>(&eyeCount), xr.eyeImageInfos.data());
+    xrEnumerateViewConfigurationViews(xrInstance, xrSystemId, viewType, static_cast<uint32_t>(eyeImageInfos.size()),
+                                      reinterpret_cast<uint32_t*>(&eyeCount), eyeImageInfos.data());
   if (XR_FAILED(result))
   {
     error = Error::OpenXR;
@@ -142,8 +142,8 @@ Headset::Headset(const Context* context) : context(context)
   }
 
   // Allocate the eye poses
-  xr.eyePoses.resize(eyeCount);
-  for (XrView& eyePose : xr.eyePoses)
+  eyePoses.resize(eyeCount);
+  for (XrView& eyePose : eyePoses)
   {
     eyePose.type = XR_TYPE_VIEW;
     eyePose.next = nullptr;
@@ -152,7 +152,7 @@ Headset::Headset(const Context* context) : context(context)
   // Verify that the desired color format is supported
   {
     uint32_t formatCount = 0u;
-    result = xrEnumerateSwapchainFormats(xr.session, 0u, &formatCount, nullptr);
+    result = xrEnumerateSwapchainFormats(session, 0u, &formatCount, nullptr);
     if (XR_FAILED(result))
     {
       error = Error::OpenXR;
@@ -160,7 +160,7 @@ Headset::Headset(const Context* context) : context(context)
     }
 
     std::vector<int64_t> formats(formatCount);
-    result = xrEnumerateSwapchainFormats(xr.session, formatCount, &formatCount, formats.data());
+    result = xrEnumerateSwapchainFormats(session, formatCount, &formatCount, formats.data());
     if (XR_FAILED(result))
     {
       error = Error::OpenXR;
@@ -202,14 +202,14 @@ Headset::Headset(const Context* context) : context(context)
     imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vkCreateImage(vkDevice, &imageCreateInfo, nullptr, &vk.depthImage) != VK_SUCCESS)
+    if (vkCreateImage(device, &imageCreateInfo, nullptr, &depthImage) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
     }
 
     VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(vkDevice, vk.depthImage, &memoryRequirements);
+    vkGetImageMemoryRequirements(device, depthImage, &memoryRequirements);
 
     VkPhysicalDeviceMemoryProperties supportedMemoryProperties;
     vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &supportedMemoryProperties);
@@ -238,13 +238,13 @@ Headset::Headset(const Context* context) : context(context)
     VkMemoryAllocateInfo memoryAllocateInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     memoryAllocateInfo.allocationSize = memoryRequirements.size;
     memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
-    if (vkAllocateMemory(vkDevice, &memoryAllocateInfo, nullptr, &vk.depthMemory) != VK_SUCCESS)
+    if (vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &depthMemory) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
     }
 
-    if (vkBindImageMemory(vkDevice, vk.depthImage, vk.depthMemory, 0) != VK_SUCCESS)
+    if (vkBindImageMemory(device, depthImage, depthMemory, 0) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
@@ -252,7 +252,7 @@ Headset::Headset(const Context* context) : context(context)
 
     // Create an image view
     VkImageViewCreateInfo imageViewCreateInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-    imageViewCreateInfo.image = vk.depthImage;
+    imageViewCreateInfo.image = depthImage;
     imageViewCreateInfo.format = depthFormat;
     imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
     imageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -262,7 +262,7 @@ Headset::Headset(const Context* context) : context(context)
     imageViewCreateInfo.subresourceRange.baseArrayLayer = 0u;
     imageViewCreateInfo.subresourceRange.baseMipLevel = 0u;
     imageViewCreateInfo.subresourceRange.levelCount = 1u;
-    if (vkCreateImageView(vkDevice, &imageViewCreateInfo, nullptr, &vk.depthImageView) != VK_SUCCESS)
+    if (vkCreateImageView(device, &imageViewCreateInfo, nullptr, &depthImageView) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
@@ -271,7 +271,7 @@ Headset::Headset(const Context* context) : context(context)
 
   // Create a swapchain and render targets
   {
-    const XrViewConfigurationView& eyeImageInfo = xr.eyeImageInfos.at(0u);
+    const XrViewConfigurationView& eyeImageInfo = eyeImageInfos.at(0u);
 
     // Create a swapchain
     XrSwapchainCreateInfo swapchainCreateInfo{ XR_TYPE_SWAPCHAIN_CREATE_INFO };
@@ -283,7 +283,7 @@ Headset::Headset(const Context* context) : context(context)
     swapchainCreateInfo.faceCount = 1u;
     swapchainCreateInfo.mipCount = 1u;
 
-    result = xrCreateSwapchain(xr.session, &swapchainCreateInfo, &xr.swapchain);
+    result = xrCreateSwapchain(session, &swapchainCreateInfo, &swapchain);
     if (XR_FAILED(result))
     {
       error = Error::OpenXR;
@@ -292,7 +292,7 @@ Headset::Headset(const Context* context) : context(context)
 
     // Get the number of swapchain images
     uint32_t swapchainImageCount;
-    result = xrEnumerateSwapchainImages(xr.swapchain, 0u, &swapchainImageCount, nullptr);
+    result = xrEnumerateSwapchainImages(swapchain, 0u, &swapchainImageCount, nullptr);
     if (XR_FAILED(result))
     {
       error = Error::OpenXR;
@@ -308,8 +308,8 @@ Headset::Headset(const Context* context) : context(context)
     }
 
     XrSwapchainImageBaseHeader* data = reinterpret_cast<XrSwapchainImageBaseHeader*>(swapchainImages.data());
-    result = xrEnumerateSwapchainImages(xr.swapchain, static_cast<uint32_t>(swapchainImages.size()),
-                                        &swapchainImageCount, data);
+    result =
+      xrEnumerateSwapchainImages(swapchain, static_cast<uint32_t>(swapchainImages.size()), &swapchainImageCount, data);
     if (XR_FAILED(result))
     {
       error = Error::OpenXR;
@@ -317,14 +317,13 @@ Headset::Headset(const Context* context) : context(context)
     }
 
     // Create the render targets
-    xr.swapchainRenderTargets.resize(swapchainImages.size());
-    for (size_t renderTargetIndex = 0u; renderTargetIndex < xr.swapchainRenderTargets.size(); ++renderTargetIndex)
+    swapchainRenderTargets.resize(swapchainImages.size());
+    for (size_t renderTargetIndex = 0u; renderTargetIndex < swapchainRenderTargets.size(); ++renderTargetIndex)
     {
-      RenderTarget*& renderTarget = xr.swapchainRenderTargets.at(renderTargetIndex);
+      RenderTarget*& renderTarget = swapchainRenderTargets.at(renderTargetIndex);
 
       const VkImage image = swapchainImages.at(renderTargetIndex).image;
-      renderTarget =
-        new RenderTarget(vkDevice, image, vk.depthImageView, eyeResolution, colorFormat, vk.renderPass, 2u);
+      renderTarget = new RenderTarget(device, image, depthImageView, eyeResolution, colorFormat, renderPass, 2u);
       if (!renderTarget->isValid())
       {
         error = Error::Vulkan;
@@ -334,16 +333,16 @@ Headset::Headset(const Context* context) : context(context)
   }
 
   // Create the eye render infos
-  xr.eyeRenderInfos.resize(eyeCount);
-  for (size_t eyeIndex = 0u; eyeIndex < xr.eyeRenderInfos.size(); ++eyeIndex)
+  eyeRenderInfos.resize(eyeCount);
+  for (size_t eyeIndex = 0u; eyeIndex < eyeRenderInfos.size(); ++eyeIndex)
   {
-    XrCompositionLayerProjectionView& eyeRenderInfo = xr.eyeRenderInfos.at(eyeIndex);
+    XrCompositionLayerProjectionView& eyeRenderInfo = eyeRenderInfos.at(eyeIndex);
     eyeRenderInfo.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
     eyeRenderInfo.next = nullptr;
 
     // Associate this eye with the swapchain
-    const XrViewConfigurationView& eyeImageInfo = xr.eyeImageInfos.at(eyeIndex);
-    eyeRenderInfo.subImage.swapchain = xr.swapchain;
+    const XrViewConfigurationView& eyeImageInfo = eyeImageInfos.at(eyeIndex);
+    eyeRenderInfo.subImage.swapchain = swapchain;
     eyeRenderInfo.subImage.imageArrayIndex = static_cast<uint32_t>(eyeIndex);
     eyeRenderInfo.subImage.imageRect.offset = { 0, 0 };
     eyeRenderInfo.subImage.imageRect.extent = { static_cast<int32_t>(eyeImageInfo.recommendedImageRectWidth),
@@ -358,24 +357,24 @@ Headset::Headset(const Context* context) : context(context)
 void Headset::destroy() const
 {
   // Clean up OpenXR
-  xrEndSession(xr.session);
-  xrDestroySwapchain(xr.swapchain);
+  xrEndSession(session);
+  xrDestroySwapchain(swapchain);
 
-  for (const RenderTarget* renderTarget : xr.swapchainRenderTargets)
+  for (const RenderTarget* renderTarget : swapchainRenderTargets)
   {
     renderTarget->destroy();
     delete renderTarget;
   }
 
-  xrDestroySpace(xr.space);
-  xrDestroySession(xr.session);
+  xrDestroySpace(space);
+  xrDestroySession(session);
 
   // Clean up Vulkan
   const VkDevice vkDevice = context->getVkDevice();
-  vkDestroyImageView(vkDevice, vk.depthImageView, nullptr);
-  vkFreeMemory(vkDevice, vk.depthMemory, nullptr);
-  vkDestroyImage(vkDevice, vk.depthImage, nullptr);
-  vkDestroyRenderPass(vkDevice, vk.renderPass, nullptr);
+  vkDestroyImageView(vkDevice, depthImageView, nullptr);
+  vkFreeMemory(vkDevice, depthMemory, nullptr);
+  vkDestroyImage(vkDevice, depthImage, nullptr);
+  vkDestroyRenderPass(vkDevice, renderPass, nullptr);
 }
 
 Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
@@ -395,7 +394,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:
     {
       XrEventDataSessionStateChanged* event = reinterpret_cast<XrEventDataSessionStateChanged*>(&buffer);
-      xr.sessionState = event->state;
+      sessionState = event->state;
 
       if (event->state == XR_SESSION_STATE_READY)
       {
@@ -424,8 +423,8 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     }
   }
 
-  if (xr.sessionState != XR_SESSION_STATE_READY && xr.sessionState != XR_SESSION_STATE_SYNCHRONIZED &&
-      xr.sessionState != XR_SESSION_STATE_VISIBLE && xr.sessionState != XR_SESSION_STATE_FOCUSED)
+  if (sessionState != XR_SESSION_STATE_READY && sessionState != XR_SESSION_STATE_SYNCHRONIZED &&
+      sessionState != XR_SESSION_STATE_VISIBLE && sessionState != XR_SESSION_STATE_FOCUSED)
   {
     // If we are not ready, synchronized, visible or focused, we skip all processing of this frame
     // This means no waiting, no beginning or ending of the frame at all
@@ -433,9 +432,9 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   }
 
   // Wait for the new frame
-  xr.frameState.type = XR_TYPE_FRAME_STATE;
+  frameState.type = XR_TYPE_FRAME_STATE;
   XrFrameWaitInfo frameWaitInfo{ XR_TYPE_FRAME_WAIT_INFO };
-  XrResult result = xrWaitFrame(xr.session, &frameWaitInfo, &xr.frameState);
+  XrResult result = xrWaitFrame(session, &frameWaitInfo, &frameState);
   if (XR_FAILED(result))
   {
     return BeginFrameResult::Error;
@@ -443,13 +442,13 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
   // Begin the new frame
   XrFrameBeginInfo frameBeginInfo{ XR_TYPE_FRAME_BEGIN_INFO };
-  result = xrBeginFrame(xr.session, &frameBeginInfo);
+  result = xrBeginFrame(session, &frameBeginInfo);
   if (XR_FAILED(result))
   {
     return BeginFrameResult::Error;
   }
 
-  if (!xr.frameState.shouldRender)
+  if (!frameState.shouldRender)
   {
     // Let the host know that we don't want to render this frame
     // We do still need to end the frame however
@@ -457,14 +456,14 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   }
 
   // Update the eye poses
-  xr.viewState.type = XR_TYPE_VIEW_STATE;
+  viewState.type = XR_TYPE_VIEW_STATE;
   uint32_t viewCount;
   XrViewLocateInfo viewLocateInfo{ XR_TYPE_VIEW_LOCATE_INFO };
   viewLocateInfo.viewConfigurationType = context->getXrViewType();
-  viewLocateInfo.displayTime = xr.frameState.predictedDisplayTime;
-  viewLocateInfo.space = xr.space;
-  result = xrLocateViews(xr.session, &viewLocateInfo, &xr.viewState, static_cast<uint32_t>(xr.eyePoses.size()),
-                         &viewCount, xr.eyePoses.data());
+  viewLocateInfo.displayTime = frameState.predictedDisplayTime;
+  viewLocateInfo.space = space;
+  result = xrLocateViews(session, &viewLocateInfo, &viewState, static_cast<uint32_t>(eyePoses.size()), &viewCount,
+                         eyePoses.data());
   if (XR_FAILED(result))
   {
     return BeginFrameResult::Error;
@@ -479,8 +478,8 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   for (size_t eyeIndex = 0u; eyeIndex < eyeCount; ++eyeIndex)
   {
     // Copy the eye poses into the eye render infos
-    XrCompositionLayerProjectionView& eyeRenderInfo = xr.eyeRenderInfos.at(eyeIndex);
-    const XrView& eyePose = xr.eyePoses.at(eyeIndex);
+    XrCompositionLayerProjectionView& eyeRenderInfo = eyeRenderInfos.at(eyeIndex);
+    const XrView& eyePose = eyePoses.at(eyeIndex);
     eyeRenderInfo.pose = eyePose.pose;
     eyeRenderInfo.fov = eyePose.fov;
 
@@ -492,7 +491,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
   // Acquire the swapchain image
   XrSwapchainImageAcquireInfo swapchainImageAcquireInfo{ XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
-  result = xrAcquireSwapchainImage(xr.swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
+  result = xrAcquireSwapchainImage(swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
   if (XR_FAILED(result))
   {
     return BeginFrameResult::Error;
@@ -501,7 +500,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   // Wait for the swapchain image
   XrSwapchainImageWaitInfo swapchainImageWaitInfo{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
   swapchainImageWaitInfo.timeout = XR_INFINITE_DURATION;
-  result = xrWaitSwapchainImage(xr.swapchain, &swapchainImageWaitInfo);
+  result = xrWaitSwapchainImage(swapchain, &swapchainImageWaitInfo);
   if (XR_FAILED(result))
   {
     return BeginFrameResult::Error;
@@ -514,7 +513,7 @@ void Headset::endFrame() const
 {
   // Release the swapchain image
   XrSwapchainImageReleaseInfo swapchainImageReleaseInfo{ XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
-  XrResult result = xrReleaseSwapchainImage(xr.swapchain, &swapchainImageReleaseInfo);
+  XrResult result = xrReleaseSwapchainImage(swapchain, &swapchainImageReleaseInfo);
   if (XR_FAILED(result))
   {
     return;
@@ -522,25 +521,25 @@ void Headset::endFrame() const
 
   // End the frame
   XrCompositionLayerProjection compositionLayerProjection{ XR_TYPE_COMPOSITION_LAYER_PROJECTION };
-  compositionLayerProjection.space = xr.space;
-  compositionLayerProjection.viewCount = static_cast<uint32_t>(xr.eyeRenderInfos.size());
-  compositionLayerProjection.views = xr.eyeRenderInfos.data();
+  compositionLayerProjection.space = space;
+  compositionLayerProjection.viewCount = static_cast<uint32_t>(eyeRenderInfos.size());
+  compositionLayerProjection.views = eyeRenderInfos.data();
 
   std::vector<XrCompositionLayerBaseHeader*> layers;
 
-  const bool positionValid = xr.viewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT;
-  const bool orientationValid = xr.viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT;
-  if (xr.frameState.shouldRender && positionValid && orientationValid)
+  const bool positionValid = viewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT;
+  const bool orientationValid = viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT;
+  if (frameState.shouldRender && positionValid && orientationValid)
   {
     layers.push_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&compositionLayerProjection));
   }
 
   XrFrameEndInfo frameEndInfo{ XR_TYPE_FRAME_END_INFO };
-  frameEndInfo.displayTime = xr.frameState.predictedDisplayTime;
+  frameEndInfo.displayTime = frameState.predictedDisplayTime;
   frameEndInfo.layerCount = static_cast<uint32_t>(layers.size());
   frameEndInfo.layers = layers.data();
   frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-  result = xrEndFrame(xr.session, &frameEndInfo);
+  result = xrEndFrame(session, &frameEndInfo);
   if (XR_FAILED(result))
   {
     return;
@@ -554,7 +553,7 @@ Headset::Error Headset::getError() const
 
 VkRenderPass Headset::getRenderPass() const
 {
-  return vk.renderPass;
+  return renderPass;
 }
 
 size_t Headset::getEyeCount() const
@@ -564,7 +563,7 @@ size_t Headset::getEyeCount() const
 
 VkExtent2D Headset::getEyeResolution(size_t eyeIndex) const
 {
-  const XrViewConfigurationView& eyeInfo = xr.eyeImageInfos.at(eyeIndex);
+  const XrViewConfigurationView& eyeInfo = eyeImageInfos.at(eyeIndex);
   return { eyeInfo.recommendedImageRectWidth, eyeInfo.recommendedImageRectHeight };
 }
 
@@ -580,7 +579,7 @@ glm::mat4 Headset::getEyeProjectionMatrix(size_t eyeIndex) const
 
 RenderTarget* Headset::getRenderTarget(size_t swapchainImageIndex) const
 {
-  return xr.swapchainRenderTargets.at(swapchainImageIndex);
+  return swapchainRenderTargets.at(swapchainImageIndex);
 }
 
 bool Headset::onSessionStateReady() const
@@ -588,7 +587,7 @@ bool Headset::onSessionStateReady() const
   // Start the session
   XrSessionBeginInfo sessionBeginInfo{ XR_TYPE_SESSION_BEGIN_INFO };
   sessionBeginInfo.primaryViewConfigurationType = context->getXrViewType();
-  const XrResult result = xrBeginSession(xr.session, &sessionBeginInfo);
+  const XrResult result = xrBeginSession(session, &sessionBeginInfo);
   if (XR_FAILED(result))
   {
     return false;
@@ -600,7 +599,7 @@ bool Headset::onSessionStateReady() const
 bool Headset::onSessionStateStopping() const
 {
   // End the session
-  const XrResult result = xrEndSession(xr.session);
+  const XrResult result = xrEndSession(session);
   if (XR_FAILED(result))
   {
     return false;
@@ -612,7 +611,7 @@ bool Headset::onSessionStateStopping() const
 bool Headset::onSessionStateExiting() const
 {
   // Destroy the session
-  XrResult result = xrDestroySession(xr.session);
+  XrResult result = xrDestroySession(session);
   if (XR_FAILED(result))
   {
     return false;

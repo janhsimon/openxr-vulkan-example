@@ -20,7 +20,7 @@ public:
 
   Context();
 
-  bool createDevice(VkSurfaceKHR mirrorSurface); // Only call when construction succeeded
+  bool createDevice(VkSurfaceKHR mirrorSurface);
   void sync() const;
   void destroy() const; // Only call when construction and createDevice() succeeded
 
@@ -40,38 +40,28 @@ public:
 private:
   Error error = Error::Success;
 
-  // OpenXR resources
-  struct
-  {
-    // Extension function pointers
-    PFN_xrGetVulkanInstanceExtensionsKHR getVulkanInstanceExtensionsKHR = nullptr;
-    PFN_xrGetVulkanGraphicsDeviceKHR getVulkanGraphicsDeviceKHR = nullptr;
-    PFN_xrGetVulkanDeviceExtensionsKHR getVulkanDeviceExtensionsKHR = nullptr;
-    PFN_xrGetVulkanGraphicsRequirementsKHR getVulkanGraphicsRequirementsKHR = nullptr;
+  // Extension function pointers
+  PFN_xrGetVulkanInstanceExtensionsKHR xrGetVulkanInstanceExtensionsKHR = nullptr;
+  PFN_xrGetVulkanGraphicsDeviceKHR xrGetVulkanGraphicsDeviceKHR = nullptr;
+  PFN_xrGetVulkanDeviceExtensionsKHR xrGetVulkanDeviceExtensionsKHR = nullptr;
+  PFN_xrGetVulkanGraphicsRequirementsKHR xrGetVulkanGraphicsRequirementsKHR = nullptr;
 
-    XrInstance instance = nullptr;
-    XrSystemId systemId = 0u;
+  XrInstance xrInstance = nullptr;
+  XrSystemId systemId = 0u;
 
-#ifdef DEBUG
-    PFN_xrCreateDebugUtilsMessengerEXT createDebugUtilsMessengerEXT = nullptr;
-    PFN_xrDestroyDebugUtilsMessengerEXT destroyDebugUtilsMessengerEXT = nullptr;
-    XrDebugUtilsMessengerEXT debugUtilsMessenger = nullptr;
-#endif
-  } xr;
-
-  // Vulkan resources
-  struct
-  {
-    VkInstance instance = nullptr;
-    VkPhysicalDevice physicalDevice = nullptr;
-    uint32_t drawQueueFamilyIndex = 0u, presentQueueFamilyIndex = 0u;
-    VkDevice device = nullptr;
-    VkQueue drawQueue = nullptr, presentQueue = nullptr;
+  VkInstance vkInstance = nullptr;
+  VkPhysicalDevice physicalDevice = nullptr;
+  uint32_t drawQueueFamilyIndex = 0u, presentQueueFamilyIndex = 0u;
+  VkDevice device = nullptr;
+  VkQueue drawQueue = nullptr, presentQueue = nullptr;
 
 #ifdef DEBUG
-    PFN_vkCreateDebugUtilsMessengerEXT createDebugUtilsMessengerEXT = nullptr;
-    PFN_vkDestroyDebugUtilsMessengerEXT destroyDebugUtilsMessengerEXT = nullptr;
-    VkDebugUtilsMessengerEXT debugUtilsMessenger = nullptr;
+  PFN_xrCreateDebugUtilsMessengerEXT xrCreateDebugUtilsMessengerEXT = nullptr;
+  PFN_xrDestroyDebugUtilsMessengerEXT xrDestroyDebugUtilsMessengerEXT = nullptr;
+  XrDebugUtilsMessengerEXT xrDebugUtilsMessenger = nullptr;
+
+  PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT = nullptr;
+  PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = nullptr;
+  VkDebugUtilsMessengerEXT vkDebugUtilsMessenger = nullptr;
 #endif
-  } vk;
 };
