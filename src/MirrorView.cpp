@@ -3,6 +3,7 @@
 #include "Context.h"
 #include "Headset.h"
 #include "RenderTarget.h"
+#include "Renderer.h"
 
 #include <glfw/glfw3.h>
 
@@ -33,8 +34,8 @@ MirrorView::MirrorView(const Context* context) : context(context)
   // Create a fullscreen window
   GLFWmonitor* monitor = glfwGetPrimaryMonitor();
 
-  int x, y, width, height;
-  glfwGetMonitorWorkarea(monitor, &x, &y, &width, &height);
+  int width, height;
+  glfwGetMonitorWorkarea(monitor, nullptr, nullptr, &width, &height);
 
 #ifdef DEBUG
   // Create a quarter-sized window in debug mode instead
@@ -66,7 +67,7 @@ MirrorView::MirrorView(const Context* context) : context(context)
 
 void MirrorView::destroy() const
 {
-  vkDestroySwapchainKHR(headset->getDevice(), swapchain, nullptr);
+  vkDestroySwapchainKHR(context->getVkDevice(), swapchain, nullptr);
   vkDestroySurfaceKHR(context->getVkInstance(), surface, nullptr);
 
   glfwDestroyWindow(window);
@@ -78,9 +79,11 @@ void MirrorView::onWindowResize()
   resizeDetected = true;
 }
 
-bool MirrorView::mirrorHeadset(const Headset* headset)
+bool MirrorView::connect(const Headset* headset, const Renderer* renderer)
 {
   this->headset = headset;
+  this->renderer = renderer;
+
   return recreateSwapchain();
 }
 
@@ -109,8 +112,8 @@ bool MirrorView::render(uint32_t swapchainImageIndex)
     }
   }
 
-  VkResult result =
-    vkAcquireNextImageKHR(headset->getDevice(), swapchain, UINT64_MAX, headset->getImageAvailableSemaphore(),
+  const VkResult result =
+    vkAcquireNextImageKHR(context->getVkDevice(), swapchain, UINT64_MAX, renderer->getImageAvailableSemaphore(),
                           VK_NULL_HANDLE, &destinationImageIndex);
   if (result == VK_ERROR_OUT_OF_DATE_KHR)
   {
@@ -124,7 +127,7 @@ bool MirrorView::render(uint32_t swapchainImageIndex)
     return false;
   }
 
-  const VkCommandBuffer commandBuffer = headset->getCommandBuffer();
+  const VkCommandBuffer commandBuffer = renderer->getCommandBuffer();
   const VkImage sourceImage = headset->getRenderTarget(swapchainImageIndex)->getImage();
   const VkImage destinationImage = swapchainImages.at(destinationImageIndex);
   const VkExtent2D resolution = headset->getEyeResolution(mirrorEyeIndex);
@@ -206,7 +209,7 @@ bool MirrorView::render(uint32_t swapchainImageIndex)
 
 void MirrorView::present()
 {
-  const VkSemaphore renderFinishedSemaphore = headset->getRenderFinishedSemaphore();
+  const VkSemaphore renderFinishedSemaphore = renderer->getRenderFinishedSemaphore();
 
   VkPresentInfoKHR presentInfo{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
   presentInfo.waitSemaphoreCount = 1u;
@@ -215,7 +218,7 @@ void MirrorView::present()
   presentInfo.pSwapchains = &swapchain;
   presentInfo.pImageIndices = &destinationImageIndex;
 
-  const VkResult result = vkQueuePresentKHR(headset->getPresentQueue(), &presentInfo);
+  const VkResult result = vkQueuePresentKHR(context->getVkPresentQueue(), &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
   {
     // Recreate the swapchain for the next frame if necessary
@@ -247,8 +250,7 @@ VkSurfaceKHR MirrorView::getSurface() const
 
 bool MirrorView::recreateSwapchain()
 {
-  const VkDevice device = headset->getDevice();
-  vkDeviceWaitIdle(device);
+  context->sync();
 
   const VkPhysicalDevice physicalDevice = context->getVkPhysicalDevice();
 
@@ -324,10 +326,12 @@ bool MirrorView::recreateSwapchain()
     }
   }
 
+  const VkDevice vkDevice = context->getVkDevice();
+
   // Clean up before recreating the swapchain and render targets
   if (swapchain)
   {
-    vkDestroySwapchainKHR(headset->getDevice(), swapchain, nullptr);
+    vkDestroySwapchainKHR(vkDevice, swapchain, nullptr);
   }
 
   // Create a new swapchain
@@ -344,20 +348,20 @@ bool MirrorView::recreateSwapchain()
   swapchainCreateInfo.preTransform = surfaceCapabilities.currentTransform;
   swapchainCreateInfo.clipped = VK_TRUE;
   swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  if (vkCreateSwapchainKHR(device, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS)
+  if (vkCreateSwapchainKHR(vkDevice, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS)
   {
     return false;
   }
 
   // Retrieve the new swapchain images
   uint32_t swapchainImageCount = 0u;
-  if (vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr) != VK_SUCCESS)
+  if (vkGetSwapchainImagesKHR(vkDevice, swapchain, &swapchainImageCount, nullptr) != VK_SUCCESS)
   {
     return false;
   }
 
   swapchainImages.resize(swapchainImageCount);
-  if (vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages.data()) != VK_SUCCESS)
+  if (vkGetSwapchainImagesKHR(vkDevice, swapchain, &swapchainImageCount, swapchainImages.data()) != VK_SUCCESS)
   {
     return false;
   }

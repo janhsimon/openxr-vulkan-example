@@ -13,257 +13,12 @@ inline constexpr VkFormat colorFormat = VK_FORMAT_R8G8B8A8_SRGB;
 inline constexpr VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 } // namespace
 
-Headset::Headset(const Context* context, VkSurfaceKHR mirrorSurface) : context(context)
+Headset::Headset(const Context* context) : context(context)
 {
-  const VkPhysicalDevice physicalDevice = context->getVkPhysicalDevice();
-
-  // Pick the draw queue family index
-  {
-    // Retrieve the queue families
-    std::vector<VkQueueFamilyProperties> queueFamilies;
-    uint32_t queueFamilyCount;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
-
-    queueFamilies.resize(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
-
-    bool drawQueueFamilyIndexFound = false;
-    for (size_t queueFamilyIndexCandidate = 0u; queueFamilyIndexCandidate < queueFamilies.size();
-         ++queueFamilyIndexCandidate)
-    {
-      const VkQueueFamilyProperties& queueFamilyCandidate = queueFamilies.at(queueFamilyIndexCandidate);
-
-      // Check that the queue family includes actual queues
-      if (queueFamilyCandidate.queueCount == 0u)
-      {
-        continue;
-      }
-
-      // Check the queue family for drawing support
-      if (queueFamilyCandidate.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-      {
-        vk.drawQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
-        drawQueueFamilyIndexFound = true;
-        break;
-      }
-    }
-
-    if (!drawQueueFamilyIndexFound)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-  }
-
-  // Pick the present queue family index
-  {
-    // Retrieve the queue families
-    std::vector<VkQueueFamilyProperties> queueFamilies;
-    uint32_t queueFamilyCount = 0u;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
-
-    queueFamilies.resize(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
-
-    bool presentQueueFamilyIndexFound = false;
-    for (size_t queueFamilyIndexCandidate = 0u; queueFamilyIndexCandidate < queueFamilies.size();
-         ++queueFamilyIndexCandidate)
-    {
-      const VkQueueFamilyProperties& queueFamilyCandidate = queueFamilies.at(queueFamilyIndexCandidate);
-
-      // Check that the queue family includes actual queues
-      if (queueFamilyCandidate.queueCount == 0u)
-      {
-        continue;
-      }
-
-      // Check the queue family for presenting support
-      VkBool32 presentSupport = false;
-      if (vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, static_cast<uint32_t>(queueFamilyIndexCandidate),
-                                               mirrorSurface, &presentSupport) != VK_SUCCESS)
-      {
-        error = Error::Vulkan;
-        return;
-      }
-
-      if (!presentQueueFamilyIndexFound && presentSupport)
-      {
-        vk.presentQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
-        presentQueueFamilyIndexFound = true;
-        break;
-      }
-    }
-
-    if (!presentQueueFamilyIndexFound)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-  }
-
-  // Get all supported Vulkan device extensions
-  std::vector<VkExtensionProperties> supportedVulkanDeviceExtensions;
-  {
-    uint32_t deviceExtensionCount;
-    if (vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionCount, nullptr) != VK_SUCCESS)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-
-    supportedVulkanDeviceExtensions.resize(deviceExtensionCount);
-    if (vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionCount,
-                                             supportedVulkanDeviceExtensions.data()) != VK_SUCCESS)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-  }
-
-  const XrInstance instance = context->getXrInstance();
-  const XrSystemId systemId = context->getXrSystemId();
-
-  // Load the required OpenXR extension functions
-  if (!util::loadXrExtensionFunction(instance, "xrGetVulkanDeviceExtensionsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanDeviceExtensionsKHR)))
-  {
-    error = Error::OpenXR;
-    return;
-  }
-  if (!util::loadXrExtensionFunction(instance, "xrGetVulkanGraphicsRequirementsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanGraphicsRequirementsKHR)))
-  {
-    error = Error::OpenXR;
-    return;
-  }
-
-  // Get the required Vulkan device extensions from OpenXR
-  std::vector<const char*> vulkanDeviceExtensions;
-  {
-    uint32_t count;
-    XrResult result = xr.getVulkanDeviceExtensionsKHR(instance, systemId, 0u, &count, nullptr);
-    if (XR_FAILED(result))
-    {
-      error = Error::OpenXR;
-      return;
-    }
-
-    std::string buffer;
-    buffer.resize(count);
-    result = xr.getVulkanDeviceExtensionsKHR(instance, systemId, count, &count, buffer.data());
-    if (XR_FAILED(result))
-    {
-      error = Error::OpenXR;
-      return;
-    }
-
-    vulkanDeviceExtensions = util::unpackExtensionString(buffer);
-  }
-
-  // Add the required swapchain extension for mirror view
-  vulkanDeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-
-  // Check that all Vulkan device extensions are supported
-  {
-    for (const char* extension : vulkanDeviceExtensions)
-    {
-      bool extensionSupported = false;
-      for (const VkExtensionProperties& supportedExtension : supportedVulkanDeviceExtensions)
-      {
-        if (strcmp(extension, supportedExtension.extensionName) == 0)
-        {
-          extensionSupported = true;
-          break;
-        }
-      }
-
-      if (!extensionSupported)
-      {
-        error = Error::Vulkan;
-        return;
-      }
-    }
-  }
-
-  // Create a device
-  {
-    // Verify that the required physical device features are supported
-    VkPhysicalDeviceFeatures physicalDeviceFeatures;
-    vkGetPhysicalDeviceFeatures(physicalDevice, &physicalDeviceFeatures);
-    if (!physicalDeviceFeatures.shaderStorageImageMultisample)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-
-    VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    VkPhysicalDeviceMultiviewFeatures physicalDeviceMultiviewFeatures{
-      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES
-    };
-    physicalDeviceFeatures2.pNext = &physicalDeviceMultiviewFeatures;
-    vkGetPhysicalDeviceFeatures2(physicalDevice, &physicalDeviceFeatures2);
-    if (!physicalDeviceMultiviewFeatures.multiview)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-
-    physicalDeviceFeatures.shaderStorageImageMultisample = VK_TRUE; // Needed for some OpenXR implementations
-    physicalDeviceMultiviewFeatures.multiview = VK_TRUE;            // Needed for stereo rendering
-
-    constexpr float queuePriority = 1.0f;
-
-    std::vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos;
-
-    VkDeviceQueueCreateInfo deviceQueueCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-    deviceQueueCreateInfo.queueFamilyIndex = vk.drawQueueFamilyIndex;
-    deviceQueueCreateInfo.queueCount = 1u;
-    deviceQueueCreateInfo.pQueuePriorities = &queuePriority;
-    deviceQueueCreateInfos.push_back(deviceQueueCreateInfo);
-
-    if (vk.drawQueueFamilyIndex != vk.presentQueueFamilyIndex)
-    {
-      deviceQueueCreateInfo.queueFamilyIndex = vk.presentQueueFamilyIndex;
-      deviceQueueCreateInfos.push_back(deviceQueueCreateInfo);
-    }
-
-    VkDeviceCreateInfo deviceCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
-    deviceCreateInfo.pNext = &physicalDeviceMultiviewFeatures;
-    deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(vulkanDeviceExtensions.size());
-    deviceCreateInfo.ppEnabledExtensionNames = vulkanDeviceExtensions.data();
-    deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
-    deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(deviceQueueCreateInfos.size());
-    deviceCreateInfo.pQueueCreateInfos = deviceQueueCreateInfos.data();
-    if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &vk.device) != VK_SUCCESS)
-    {
-      error = Error::Vulkan;
-      return;
-    }
-  }
-
-  // Check the graphics requirements for Vulkan
-  XrGraphicsRequirementsVulkanKHR graphicsRequirements{ XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR };
-  XrResult result = xr.getVulkanGraphicsRequirementsKHR(instance, systemId, &graphicsRequirements);
-  if (XR_FAILED(result))
-  {
-    error = Error::OpenXR;
-    return;
-  }
-
-  // Retrieve the queues
-  vkGetDeviceQueue(vk.device, vk.drawQueueFamilyIndex, 0u, &vk.drawQueue);
-  if (!vk.drawQueue)
-  {
-    error = Error::Vulkan;
-    return;
-  }
-
-  vkGetDeviceQueue(vk.device, vk.presentQueueFamilyIndex, 0u, &vk.presentQueue);
-  if (!vk.presentQueue)
-  {
-    error = Error::Vulkan;
-    return;
-  }
+  const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
+  const VkDevice vkDevice = context->getVkDevice();
+  const XrInstance xrInstance = context->getXrInstance();
+  const XrSystemId xrSystemId = context->getXrSystemId();
 
   // Create a render pass
   {
@@ -320,25 +75,27 @@ Headset::Headset(const Context* context, VkSurfaceKHR mirrorSurface) : context(c
     renderPassCreateInfo.pAttachments = attachments.data();
     renderPassCreateInfo.subpassCount = 1u;
     renderPassCreateInfo.pSubpasses = &subpassDescription;
-    if (vkCreateRenderPass(vk.device, &renderPassCreateInfo, nullptr, &vk.renderPass) != VK_SUCCESS)
+    if (vkCreateRenderPass(vkDevice, &renderPassCreateInfo, nullptr, &vk.renderPass) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
     }
   }
 
+  const uint32_t vkDrawQueueFamilyIndex = context->getVkDrawQueueFamilyIndex();
+
   // Create a session with Vulkan graphics binding
   XrGraphicsBindingVulkanKHR graphicsBinding{ XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR };
-  graphicsBinding.device = vk.device;
+  graphicsBinding.device = vkDevice;
   graphicsBinding.instance = context->getVkInstance();
-  graphicsBinding.physicalDevice = physicalDevice;
-  graphicsBinding.queueFamilyIndex = vk.drawQueueFamilyIndex;
+  graphicsBinding.physicalDevice = vkPhysicalDevice;
+  graphicsBinding.queueFamilyIndex = vkDrawQueueFamilyIndex;
   graphicsBinding.queueIndex = 0u;
 
   XrSessionCreateInfo sessionCreateInfo{ XR_TYPE_SESSION_CREATE_INFO };
   sessionCreateInfo.next = &graphicsBinding;
-  sessionCreateInfo.systemId = systemId;
-  result = xrCreateSession(instance, &sessionCreateInfo, &xr.session);
+  sessionCreateInfo.systemId = xrSystemId;
+  XrResult result = xrCreateSession(xrInstance, &sessionCreateInfo, &xr.session);
   if (XR_FAILED(result))
   {
     error = Error::OpenXR;
@@ -359,8 +116,8 @@ Headset::Headset(const Context* context, VkSurfaceKHR mirrorSurface) : context(c
   const XrViewConfigurationType viewType = context->getXrViewType();
 
   // Get the number of eyes
-  result = xrEnumerateViewConfigurationViews(instance, systemId, viewType, 0u, reinterpret_cast<uint32_t*>(&eyeCount),
-                                             nullptr);
+  result = xrEnumerateViewConfigurationViews(xrInstance, xrSystemId, viewType, 0u,
+                                             reinterpret_cast<uint32_t*>(&eyeCount), nullptr);
   if (XR_FAILED(result))
   {
     error = Error::OpenXR;
@@ -376,7 +133,7 @@ Headset::Headset(const Context* context, VkSurfaceKHR mirrorSurface) : context(c
   }
 
   result =
-    xrEnumerateViewConfigurationViews(instance, systemId, viewType, static_cast<uint32_t>(xr.eyeImageInfos.size()),
+    xrEnumerateViewConfigurationViews(xrInstance, xrSystemId, viewType, static_cast<uint32_t>(xr.eyeImageInfos.size()),
                                       reinterpret_cast<uint32_t*>(&eyeCount), xr.eyeImageInfos.data());
   if (XR_FAILED(result))
   {
@@ -445,17 +202,17 @@ Headset::Headset(const Context* context, VkSurfaceKHR mirrorSurface) : context(c
     imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vkCreateImage(vk.device, &imageCreateInfo, nullptr, &vk.depthImage) != VK_SUCCESS)
+    if (vkCreateImage(vkDevice, &imageCreateInfo, nullptr, &vk.depthImage) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
     }
 
     VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(vk.device, vk.depthImage, &memoryRequirements);
+    vkGetImageMemoryRequirements(vkDevice, vk.depthImage, &memoryRequirements);
 
     VkPhysicalDeviceMemoryProperties supportedMemoryProperties;
-    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &supportedMemoryProperties);
+    vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &supportedMemoryProperties);
 
     const VkMemoryPropertyFlags memoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     const VkMemoryPropertyFlags typeFilter = memoryRequirements.memoryTypeBits;
@@ -481,13 +238,13 @@ Headset::Headset(const Context* context, VkSurfaceKHR mirrorSurface) : context(c
     VkMemoryAllocateInfo memoryAllocateInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     memoryAllocateInfo.allocationSize = memoryRequirements.size;
     memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
-    if (vkAllocateMemory(vk.device, &memoryAllocateInfo, nullptr, &vk.depthMemory) != VK_SUCCESS)
+    if (vkAllocateMemory(vkDevice, &memoryAllocateInfo, nullptr, &vk.depthMemory) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
     }
 
-    if (vkBindImageMemory(vk.device, vk.depthImage, vk.depthMemory, 0) != VK_SUCCESS)
+    if (vkBindImageMemory(vkDevice, vk.depthImage, vk.depthMemory, 0) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
@@ -505,7 +262,7 @@ Headset::Headset(const Context* context, VkSurfaceKHR mirrorSurface) : context(c
     imageViewCreateInfo.subresourceRange.baseArrayLayer = 0u;
     imageViewCreateInfo.subresourceRange.baseMipLevel = 0u;
     imageViewCreateInfo.subresourceRange.levelCount = 1u;
-    if (vkCreateImageView(vk.device, &imageViewCreateInfo, nullptr, &vk.depthImageView) != VK_SUCCESS)
+    if (vkCreateImageView(vkDevice, &imageViewCreateInfo, nullptr, &vk.depthImageView) != VK_SUCCESS)
     {
       error = Error::Vulkan;
       return;
@@ -567,7 +324,7 @@ Headset::Headset(const Context* context, VkSurfaceKHR mirrorSurface) : context(c
 
       const VkImage image = swapchainImages.at(renderTargetIndex).image;
       renderTarget =
-        new RenderTarget(vk.device, image, vk.depthImageView, eyeResolution, colorFormat, vk.renderPass, 2u);
+        new RenderTarget(vkDevice, image, vk.depthImageView, eyeResolution, colorFormat, vk.renderPass, 2u);
       if (!renderTarget->isValid())
       {
         error = Error::Vulkan;
@@ -596,55 +353,6 @@ Headset::Headset(const Context* context, VkSurfaceKHR mirrorSurface) : context(c
   // Allocate view and projection matrices
   eyeViewMatrices.resize(eyeCount);
   eyeProjectionMatrices.resize(eyeCount);
-
-  // Create a command pool
-  VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-  commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  commandPoolCreateInfo.queueFamilyIndex = vk.drawQueueFamilyIndex;
-  if (vkCreateCommandPool(vk.device, &commandPoolCreateInfo, nullptr, &vk.commandPool) != VK_SUCCESS)
-  {
-    error = Error::Vulkan;
-    return;
-  }
-
-  // Allocate a command buffer
-  VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-  commandBufferAllocateInfo.commandPool = vk.commandPool;
-  commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  commandBufferAllocateInfo.commandBufferCount = 1u;
-  if (vkAllocateCommandBuffers(vk.device, &commandBufferAllocateInfo, &vk.commandBuffer) != VK_SUCCESS)
-  {
-    error = Error::Vulkan;
-    return;
-  }
-
-  // Create the semaphores
-  VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-  if (vkCreateSemaphore(vk.device, &semaphoreCreateInfo, nullptr, &vk.imageAvailableSemaphore) != VK_SUCCESS)
-  {
-    error = Error::Vulkan;
-    return;
-  }
-
-  if (vkCreateSemaphore(vk.device, &semaphoreCreateInfo, nullptr, &vk.renderFinishedSemaphore) != VK_SUCCESS)
-  {
-    error = Error::Vulkan;
-    return;
-  }
-
-  // Create a memory fence
-  VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-  fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-  if (vkCreateFence(vk.device, &fenceCreateInfo, nullptr, &vk.inFlightFence) != VK_SUCCESS)
-  {
-    error = Error::Vulkan;
-    return;
-  }
-}
-
-void Headset::sync() const
-{
-  vkDeviceWaitIdle(vk.device);
 }
 
 void Headset::destroy() const
@@ -663,15 +371,11 @@ void Headset::destroy() const
   xrDestroySession(xr.session);
 
   // Clean up Vulkan
-  vkDestroyFence(vk.device, vk.inFlightFence, nullptr);
-  vkDestroySemaphore(vk.device, vk.renderFinishedSemaphore, nullptr);
-  vkDestroySemaphore(vk.device, vk.imageAvailableSemaphore, nullptr);
-  vkDestroyCommandPool(vk.device, vk.commandPool, nullptr);
-  vkDestroyImageView(vk.device, vk.depthImageView, nullptr);
-  vkFreeMemory(vk.device, vk.depthMemory, nullptr);
-  vkDestroyImage(vk.device, vk.depthImage, nullptr);
-  vkDestroyRenderPass(vk.device, vk.renderPass, nullptr);
-  vkDestroyDevice(vk.device, nullptr);
+  const VkDevice vkDevice = context->getVkDevice();
+  vkDestroyImageView(vkDevice, vk.depthImageView, nullptr);
+  vkFreeMemory(vkDevice, vk.depthMemory, nullptr);
+  vkDestroyImage(vkDevice, vk.depthImage, nullptr);
+  vkDestroyRenderPass(vkDevice, vk.renderPass, nullptr);
 }
 
 Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
@@ -803,46 +507,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     return BeginFrameResult::Error;
   }
 
-  if (vkResetFences(vk.device, 1u, &vk.inFlightFence) != VK_SUCCESS)
-  {
-    return BeginFrameResult::Error;
-  }
-
-  if (vkResetCommandBuffer(vk.commandBuffer, 0u) != VK_SUCCESS)
-  {
-    return BeginFrameResult::Error;
-  }
-
-  VkCommandBufferBeginInfo commandBufferBeginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-  if (vkBeginCommandBuffer(vk.commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS)
-  {
-    return BeginFrameResult::Error;
-  }
-
   return BeginFrameResult::RenderFully; // Request full rendering of the frame
-}
-
-void Headset::submit() const
-{
-  if (vkEndCommandBuffer(vk.commandBuffer) != VK_SUCCESS)
-  {
-    return;
-  }
-
-  VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-
-  VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
-  submitInfo.waitSemaphoreCount = 1u;
-  submitInfo.pWaitSemaphores = &vk.imageAvailableSemaphore;
-  submitInfo.pWaitDstStageMask = &waitStages;
-  submitInfo.commandBufferCount = 1u;
-  submitInfo.pCommandBuffers = &vk.commandBuffer;
-  submitInfo.signalSemaphoreCount = 1u;
-  submitInfo.pSignalSemaphores = &vk.renderFinishedSemaphore;
-  if (vkQueueSubmit(vk.drawQueue, 1u, &submitInfo, vk.inFlightFence) != VK_SUCCESS)
-  {
-    return;
-  }
 }
 
 void Headset::endFrame() const
@@ -861,21 +526,19 @@ void Headset::endFrame() const
   compositionLayerProjection.viewCount = static_cast<uint32_t>(xr.eyeRenderInfos.size());
   compositionLayerProjection.views = xr.eyeRenderInfos.data();
 
-  uint32_t submittedLayerCount = 1u;
-  const XrCompositionLayerBaseHeader* submittedLayers[1] = {
-    reinterpret_cast<const XrCompositionLayerBaseHeader* const>(&compositionLayerProjection)
-  };
+  std::vector<XrCompositionLayerBaseHeader*> layers;
 
-  if (!xr.frameState.shouldRender || (xr.viewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT) == 0u ||
-      (xr.viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0u)
+  const bool positionValid = xr.viewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT;
+  const bool orientationValid = xr.viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT;
+  if (xr.frameState.shouldRender && positionValid && orientationValid)
   {
-    submittedLayerCount = 0u;
+    layers.push_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&compositionLayerProjection));
   }
 
   XrFrameEndInfo frameEndInfo{ XR_TYPE_FRAME_END_INFO };
   frameEndInfo.displayTime = xr.frameState.predictedDisplayTime;
-  frameEndInfo.layerCount = submittedLayerCount;
-  frameEndInfo.layers = (submittedLayerCount == 0u ? nullptr : submittedLayers);
+  frameEndInfo.layerCount = static_cast<uint32_t>(layers.size());
+  frameEndInfo.layers = layers.data();
   frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
   result = xrEndFrame(xr.session, &frameEndInfo);
   if (XR_FAILED(result))
@@ -889,39 +552,9 @@ Headset::Error Headset::getError() const
   return error;
 }
 
-VkDevice Headset::getDevice() const
-{
-  return vk.device;
-}
-
 VkRenderPass Headset::getRenderPass() const
 {
   return vk.renderPass;
-}
-
-VkQueue Headset::getDrawQueue() const
-{
-  return vk.drawQueue;
-}
-
-VkQueue Headset::getPresentQueue() const
-{
-  return vk.presentQueue;
-}
-
-VkCommandBuffer Headset::getCommandBuffer() const
-{
-  return vk.commandBuffer;
-}
-
-VkSemaphore Headset::getImageAvailableSemaphore() const
-{
-  return vk.imageAvailableSemaphore;
-}
-
-VkSemaphore Headset::getRenderFinishedSemaphore() const
-{
-  return vk.renderFinishedSemaphore;
 }
 
 size_t Headset::getEyeCount() const

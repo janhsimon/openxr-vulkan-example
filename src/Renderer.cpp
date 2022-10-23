@@ -1,6 +1,7 @@
 #include "Renderer.h"
 
 #include "Buffer.h"
+#include "Context.h"
 #include "Headset.h"
 #include "Pipeline.h"
 #include "RenderTarget.h"
@@ -54,12 +55,57 @@ struct UniformBufferObject final
 } ubo;
 } // namespace
 
-Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : headset(headset)
+Renderer::Renderer(const Context* context, const Headset* headset) : context(context), headset(headset)
 {
-  const VkDevice device = headset->getDevice();
+  const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
+  const VkDevice vkDevice = context->getVkDevice();
+
+  // Create a command pool
+  VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+  commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  commandPoolCreateInfo.queueFamilyIndex = context->getVkDrawQueueFamilyIndex();
+  if (vkCreateCommandPool(vkDevice, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
+  {
+    valid = false;
+    return;
+  }
+
+  // Allocate a command buffer
+  VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+  commandBufferAllocateInfo.commandPool = commandPool;
+  commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  commandBufferAllocateInfo.commandBufferCount = 1u;
+  if (vkAllocateCommandBuffers(vkDevice, &commandBufferAllocateInfo, &commandBuffer) != VK_SUCCESS)
+  {
+    valid = false;
+    return;
+  }
+
+  // Create the semaphores
+  VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+  if (vkCreateSemaphore(vkDevice, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS)
+  {
+    valid = false;
+    return;
+  }
+
+  if (vkCreateSemaphore(vkDevice, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS)
+  {
+    valid = false;
+    return;
+  }
+
+  // Create a memory fence
+  VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+  fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+  if (vkCreateFence(vkDevice, &fenceCreateInfo, nullptr, &inFlightFence) != VK_SUCCESS)
+  {
+    valid = false;
+    return;
+  }
 
   // Create an empty uniform buffer
-  uniformBuffer = new Buffer(device, physicalDevice, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+  uniformBuffer = new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                              static_cast<VkDeviceSize>(sizeof(UniformBufferObject)));
 
@@ -73,7 +119,8 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
   VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
   descriptorSetLayoutCreateInfo.bindingCount = 1u;
   descriptorSetLayoutCreateInfo.pBindings = &descriptorSetLayoutBinding;
-  if (vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
+  if (vkCreateDescriptorSetLayout(vkDevice, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) !=
+      VK_SUCCESS)
   {
     valid = false;
     return;
@@ -88,7 +135,7 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
   descriptorPoolCreateInfo.poolSizeCount = 1u;
   descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
   descriptorPoolCreateInfo.maxSets = 1u;
-  if (vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)
+  if (vkCreateDescriptorPool(vkDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)
   {
     valid = false;
     return;
@@ -99,7 +146,7 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
   descriptorSetAllocateInfo.descriptorPool = descriptorPool;
   descriptorSetAllocateInfo.descriptorSetCount = 1u;
   descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
-  if (vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet) != VK_SUCCESS)
+  if (vkAllocateDescriptorSets(vkDevice, &descriptorSetAllocateInfo, &descriptorSet) != VK_SUCCESS)
   {
     valid = false;
     return;
@@ -117,13 +164,13 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
   writeDescriptorSet.descriptorCount = 1u;
   writeDescriptorSet.dstBinding = 0u;
   writeDescriptorSet.dstArrayElement = 0u;
-  vkUpdateDescriptorSets(device, 1u, &writeDescriptorSet, 0u, nullptr);
+  vkUpdateDescriptorSets(vkDevice, 1u, &writeDescriptorSet, 0u, nullptr);
 
   // Create a pipeline layout
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
   pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
   pipelineLayoutCreateInfo.setLayoutCount = 1u;
-  if (vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
+  if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
   {
     valid = false;
     return;
@@ -147,7 +194,7 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
   vertexInputAttributeDescriptionColor.format = VK_FORMAT_R32G32B32_SFLOAT;
   vertexInputAttributeDescriptionColor.offset = offsetof(Vertex, color);
 
-  gridPipeline = new Pipeline(device, pipelineLayout, headset->getRenderPass(), "shaders/Basic.vert.spv",
+  gridPipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "shaders/Basic.vert.spv",
                               "shaders/Grid.frag.spv", { vertexInputBindingDescription },
                               { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor });
   if (!gridPipeline->isValid())
@@ -157,7 +204,7 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
   }
 
   // Create the cube pipeline
-  cubePipeline = new Pipeline(device, pipelineLayout, headset->getRenderPass(), "shaders/Basic.vert.spv",
+  cubePipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "shaders/Basic.vert.spv",
                               "shaders/Cube.frag.spv", { vertexInputBindingDescription },
                               { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor });
   if (!cubePipeline->isValid())
@@ -170,7 +217,7 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
   {
     // Create a staging buffer and fill it with the vertex data
     constexpr size_t size = sizeof(vertices);
-    Buffer* stagingBuffer = new Buffer(device, physicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    Buffer* stagingBuffer = new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        static_cast<VkDeviceSize>(size), static_cast<const void*>(vertices.data()));
     if (!stagingBuffer->isValid())
@@ -181,7 +228,7 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
 
     // Create an empty target buffer
     vertexBuffer =
-      new Buffer(device, physicalDevice, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+      new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
     if (!vertexBuffer->isValid())
     {
@@ -190,7 +237,7 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
     }
 
     // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*vertexBuffer, headset->getCommandBuffer(), headset->getDrawQueue()))
+    if (!stagingBuffer->copyTo(*vertexBuffer, commandBuffer, context->getVkDrawQueue()))
     {
       valid = false;
       return;
@@ -205,7 +252,7 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
   {
     // Create a staging buffer and fill it with the index data
     constexpr size_t size = sizeof(indices);
-    Buffer* stagingBuffer = new Buffer(device, physicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    Buffer* stagingBuffer = new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        static_cast<VkDeviceSize>(size), static_cast<const void*>(indices.data()));
     if (!stagingBuffer->isValid())
@@ -216,7 +263,7 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
 
     // Create an empty target buffer
     indexBuffer =
-      new Buffer(device, physicalDevice, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+      new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
     if (!indexBuffer->isValid())
     {
@@ -225,7 +272,7 @@ Renderer::Renderer(const Headset* headset, VkPhysicalDevice physicalDevice) : he
     }
 
     // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*indexBuffer, headset->getCommandBuffer(), headset->getDrawQueue()))
+    if (!stagingBuffer->copyTo(*indexBuffer, commandBuffer, context->getVkDrawQueue()))
     {
       valid = false;
       return;
@@ -251,17 +298,39 @@ void Renderer::destroy() const
   gridPipeline->destroy();
   delete gridPipeline;
 
-  const VkDevice device = headset->getDevice();
-  vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-  vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+  const VkDevice vkDevice = context->getVkDevice();
+
+  vkDestroyPipelineLayout(vkDevice, pipelineLayout, nullptr);
+  vkDestroyDescriptorPool(vkDevice, descriptorPool, nullptr);
+  vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout, nullptr);
 
   uniformBuffer->destroy();
   delete uniformBuffer;
+
+  vkDestroyFence(vkDevice, inFlightFence, nullptr);
+  vkDestroySemaphore(vkDevice, renderFinishedSemaphore, nullptr);
+  vkDestroySemaphore(vkDevice, imageAvailableSemaphore, nullptr);
+  vkDestroyCommandPool(vkDevice, commandPool, nullptr);
 }
 
 void Renderer::render(size_t swapchainImageIndex) const
 {
+  if (vkResetFences(context->getVkDevice(), 1u, &inFlightFence) != VK_SUCCESS)
+  {
+    return;
+  }
+
+  if (vkResetCommandBuffer(commandBuffer, 0u) != VK_SUCCESS)
+  {
+    return;
+  }
+
+  VkCommandBufferBeginInfo commandBufferBeginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+  if (vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS)
+  {
+    return;
+  }
+
   // Update the uniform buffer
   ubo.world = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, 0.0f });
   for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
@@ -277,8 +346,6 @@ void Renderer::render(size_t swapchainImageIndex) const
 
   memcpy(data, &ubo, sizeof(ubo));
   uniformBuffer->unmap();
-
-  const VkCommandBuffer commandBuffer = headset->getCommandBuffer();
 
   const std::array clearValues = { VkClearValue({ 0.5f, 0.5f, 0.5f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
 
@@ -331,7 +398,45 @@ void Renderer::render(size_t swapchainImageIndex) const
   vkCmdEndRenderPass(commandBuffer);
 }
 
+void Renderer::submit() const
+{
+  if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+  {
+    return;
+  }
+
+  VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+  VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+  submitInfo.waitSemaphoreCount = 1u;
+  submitInfo.pWaitSemaphores = &imageAvailableSemaphore;
+  submitInfo.pWaitDstStageMask = &waitStages;
+  submitInfo.commandBufferCount = 1u;
+  submitInfo.pCommandBuffers = &commandBuffer;
+  submitInfo.signalSemaphoreCount = 1u;
+  submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
+  if (vkQueueSubmit(context->getVkDrawQueue(), 1u, &submitInfo, inFlightFence) != VK_SUCCESS)
+  {
+    return;
+  }
+}
+
 bool Renderer::isValid() const
 {
   return valid;
+}
+
+VkCommandBuffer Renderer::getCommandBuffer() const
+{
+  return commandBuffer;
+}
+
+VkSemaphore Renderer::getImageAvailableSemaphore() const
+{
+  return imageAvailableSemaphore;
+}
+
+VkSemaphore Renderer::getRenderFinishedSemaphore() const
+{
+  return renderFinishedSemaphore;
 }

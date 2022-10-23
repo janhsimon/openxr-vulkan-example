@@ -7,6 +7,7 @@
 class Context;
 struct GLFWwindow;
 class Headset;
+class Renderer;
 
 class MirrorView final
 {
@@ -24,7 +25,7 @@ public:
 
   void onWindowResize();
 
-  bool mirrorHeadset(const Headset* headset);
+  bool connect(const Headset* headset, const Renderer* renderer);
   void processWindowEvents() const;
   bool render(uint32_t swapchainImageIndex);
   void present();
@@ -38,6 +39,7 @@ private:
 
   const Context* context = nullptr;
   const Headset* headset = nullptr;
+  const Renderer* renderer = nullptr;
   GLFWwindow* window = nullptr;
   VkSurfaceKHR surface = nullptr;
   VkSwapchainKHR swapchain = nullptr;

@@ -20,7 +20,9 @@ public:
 
   Context();
 
-  void destroy() const; // Only call when construction succeeded
+  bool createDevice(VkSurfaceKHR mirrorSurface); // Only call when construction succeeded
+  void sync() const;
+  void destroy() const; // Only call when construction and createDevice() succeeded
 
   Error getError() const;
 
@@ -30,6 +32,10 @@ public:
 
   VkInstance getVkInstance() const;
   VkPhysicalDevice getVkPhysicalDevice() const;
+  uint32_t getVkDrawQueueFamilyIndex() const;
+  VkDevice getVkDevice() const;
+  VkQueue getVkDrawQueue() const;
+  VkQueue getVkPresentQueue() const;
 
 private:
   Error error = Error::Success;
@@ -40,6 +46,8 @@ private:
     // Extension function pointers
     PFN_xrGetVulkanInstanceExtensionsKHR getVulkanInstanceExtensionsKHR = nullptr;
     PFN_xrGetVulkanGraphicsDeviceKHR getVulkanGraphicsDeviceKHR = nullptr;
+    PFN_xrGetVulkanDeviceExtensionsKHR getVulkanDeviceExtensionsKHR = nullptr;
+    PFN_xrGetVulkanGraphicsRequirementsKHR getVulkanGraphicsRequirementsKHR = nullptr;
 
     XrInstance instance = nullptr;
     XrSystemId systemId = 0u;
@@ -56,6 +64,9 @@ private:
   {
     VkInstance instance = nullptr;
     VkPhysicalDevice physicalDevice = nullptr;
+    uint32_t drawQueueFamilyIndex = 0u, presentQueueFamilyIndex = 0u;
+    VkDevice device = nullptr;
+    VkQueue drawQueue = nullptr, presentQueue = nullptr;
 
 #ifdef DEBUG
     PFN_vkCreateDebugUtilsMessengerEXT createDebugUtilsMessengerEXT = nullptr;

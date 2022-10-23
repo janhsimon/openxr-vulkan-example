@@ -19,15 +19,12 @@ public:
   enum class Error
   {
     Success,
-    NoHeadsetDetected,
-    GLFW,
     OpenXR,
     Vulkan
   };
 
-  Headset(const Context* context, VkSurfaceKHR mirrorSurface);
+  Headset(const Context* context);
 
-  void sync() const;
   void destroy() const; // Only call when construction succeeded
 
   enum class BeginFrameResult
@@ -38,17 +35,10 @@ public:
     SkipFully    // Skip processing this frame entirely without ending it
   };
   BeginFrameResult beginFrame(uint32_t& swapchainImageIndex);
-  void submit() const;
   void endFrame() const;
 
   Error getError() const;
-  VkDevice getDevice() const;
   VkRenderPass getRenderPass() const;
-  VkQueue getDrawQueue() const;
-  VkQueue getPresentQueue() const;
-  VkCommandBuffer getCommandBuffer() const;
-  VkSemaphore getImageAvailableSemaphore() const;
-  VkSemaphore getRenderFinishedSemaphore() const;
   size_t getEyeCount() const;
   VkExtent2D getEyeResolution(size_t eyeIndex) const;
   glm::mat4 getEyeViewMatrix(size_t eyeIndex) const;
@@ -67,10 +57,6 @@ private:
   // OpenXR resources
   struct
   {
-    // Extension function pointers
-    PFN_xrGetVulkanDeviceExtensionsKHR getVulkanDeviceExtensionsKHR = nullptr;
-    PFN_xrGetVulkanGraphicsRequirementsKHR getVulkanGraphicsRequirementsKHR = nullptr;
-
     XrSession session = nullptr;
     XrSessionState sessionState = XR_SESSION_STATE_UNKNOWN;
     XrSpace space = nullptr;
@@ -87,17 +73,12 @@ private:
   // Vulkan resources
   struct
   {
-    uint32_t drawQueueFamilyIndex = 0u, presentQueueFamilyIndex = 0u;
-    VkDevice device = nullptr;
-    VkQueue drawQueue = nullptr, presentQueue = nullptr;
     VkRenderPass renderPass = nullptr;
+
+    // Depth buffer
     VkImage depthImage = nullptr;
     VkDeviceMemory depthMemory = nullptr;
     VkImageView depthImageView = nullptr;
-    VkCommandPool commandPool = nullptr;
-    VkCommandBuffer commandBuffer = nullptr;
-    VkSemaphore imageAvailableSemaphore = nullptr, renderFinishedSemaphore = nullptr;
-    VkFence inFlightFence = nullptr;
   } vk;
 
   bool onSessionStateReady() const;

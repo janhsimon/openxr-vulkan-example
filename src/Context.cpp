@@ -120,6 +120,20 @@ Context::Context()
     return;
   }
 
+  if (!util::loadXrExtensionFunction(xr.instance, "xrGetVulkanDeviceExtensionsKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanDeviceExtensionsKHR)))
+  {
+    error = Error::OpenXR;
+    return;
+  }
+
+  if (!util::loadXrExtensionFunction(xr.instance, "xrGetVulkanGraphicsRequirementsKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanGraphicsRequirementsKHR)))
+  {
+    error = Error::OpenXR;
+    return;
+  }
+
 #ifdef DEBUG
   // Create an OpenXR debug utils messenger for validation
   {
@@ -423,14 +437,252 @@ Context::Context()
     }
   }
 #endif
+}
 
+bool Context::createDevice(VkSurfaceKHR mirrorSurface)
+{
   // Retrieve the physical device from OpenXR
-  result = xr.getVulkanGraphicsDeviceKHR(xr.instance, xr.systemId, vk.instance, &vk.physicalDevice);
+  XrResult result = xr.getVulkanGraphicsDeviceKHR(xr.instance, xr.systemId, vk.instance, &vk.physicalDevice);
   if (XR_FAILED(result))
   {
-    error = Error::OpenXR;
-    return;
+    return false;
   }
+
+  // Pick the draw queue family index
+  {
+    // Retrieve the queue families
+    std::vector<VkQueueFamilyProperties> queueFamilies;
+    uint32_t queueFamilyCount;
+    vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, nullptr);
+
+    queueFamilies.resize(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, queueFamilies.data());
+
+    bool drawQueueFamilyIndexFound = false;
+    for (size_t queueFamilyIndexCandidate = 0u; queueFamilyIndexCandidate < queueFamilies.size();
+         ++queueFamilyIndexCandidate)
+    {
+      const VkQueueFamilyProperties& queueFamilyCandidate = queueFamilies.at(queueFamilyIndexCandidate);
+
+      // Check that the queue family includes actual queues
+      if (queueFamilyCandidate.queueCount == 0u)
+      {
+        continue;
+      }
+
+      // Check the queue family for drawing support
+      if (queueFamilyCandidate.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+      {
+        vk.drawQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
+        drawQueueFamilyIndexFound = true;
+        break;
+      }
+    }
+
+    if (!drawQueueFamilyIndexFound)
+    {
+      return false;
+    }
+  }
+
+  // Pick the present queue family index
+  {
+    // Retrieve the queue families
+    std::vector<VkQueueFamilyProperties> queueFamilies;
+    uint32_t queueFamilyCount = 0u;
+    vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, nullptr);
+
+    queueFamilies.resize(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(vk.physicalDevice, &queueFamilyCount, queueFamilies.data());
+
+    bool presentQueueFamilyIndexFound = false;
+    for (size_t queueFamilyIndexCandidate = 0u; queueFamilyIndexCandidate < queueFamilies.size();
+         ++queueFamilyIndexCandidate)
+    {
+      const VkQueueFamilyProperties& queueFamilyCandidate = queueFamilies.at(queueFamilyIndexCandidate);
+
+      // Check that the queue family includes actual queues
+      if (queueFamilyCandidate.queueCount == 0u)
+      {
+        continue;
+      }
+
+      // Check the queue family for presenting support
+      VkBool32 presentSupport = false;
+      if (vkGetPhysicalDeviceSurfaceSupportKHR(vk.physicalDevice, static_cast<uint32_t>(queueFamilyIndexCandidate),
+                                               mirrorSurface, &presentSupport) != VK_SUCCESS)
+      {
+        return false;
+      }
+
+      if (!presentQueueFamilyIndexFound && presentSupport)
+      {
+        vk.presentQueueFamilyIndex = static_cast<uint32_t>(queueFamilyIndexCandidate);
+        presentQueueFamilyIndexFound = true;
+        break;
+      }
+    }
+
+    if (!presentQueueFamilyIndexFound)
+    {
+      return false;
+    }
+  }
+
+  // Get all supported Vulkan device extensions
+  std::vector<VkExtensionProperties> supportedVulkanDeviceExtensions;
+  {
+    uint32_t deviceExtensionCount;
+    if (vkEnumerateDeviceExtensionProperties(vk.physicalDevice, nullptr, &deviceExtensionCount, nullptr) != VK_SUCCESS)
+    {
+      return false;
+    }
+
+    supportedVulkanDeviceExtensions.resize(deviceExtensionCount);
+    if (vkEnumerateDeviceExtensionProperties(vk.physicalDevice, nullptr, &deviceExtensionCount,
+                                             supportedVulkanDeviceExtensions.data()) != VK_SUCCESS)
+    {
+      return false;
+    }
+  }
+
+  // Load the required OpenXR extension functions
+  if (!util::loadXrExtensionFunction(xr.instance, "xrGetVulkanDeviceExtensionsKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanDeviceExtensionsKHR)))
+  {
+    return false;
+  }
+  if (!util::loadXrExtensionFunction(xr.instance, "xrGetVulkanGraphicsRequirementsKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xr.getVulkanGraphicsRequirementsKHR)))
+  {
+    return false;
+  }
+
+  // Get the required Vulkan device extensions from OpenXR
+  std::vector<const char*> vulkanDeviceExtensions;
+  {
+    uint32_t count;
+    result = xr.getVulkanDeviceExtensionsKHR(xr.instance, xr.systemId, 0u, &count, nullptr);
+    if (XR_FAILED(result))
+    {
+      return false;
+    }
+
+    std::string buffer;
+    buffer.resize(count);
+    result = xr.getVulkanDeviceExtensionsKHR(xr.instance, xr.systemId, count, &count, buffer.data());
+    if (XR_FAILED(result))
+    {
+      return false;
+    }
+
+    vulkanDeviceExtensions = util::unpackExtensionString(buffer);
+  }
+
+  // Add the required swapchain extension for mirror view
+  vulkanDeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+  // Check that all Vulkan device extensions are supported
+  {
+    for (const char* extension : vulkanDeviceExtensions)
+    {
+      bool extensionSupported = false;
+      for (const VkExtensionProperties& supportedExtension : supportedVulkanDeviceExtensions)
+      {
+        if (strcmp(extension, supportedExtension.extensionName) == 0)
+        {
+          extensionSupported = true;
+          break;
+        }
+      }
+
+      if (!extensionSupported)
+      {
+        return false;
+      }
+    }
+  }
+
+  // Create a device
+  {
+    // Verify that the required physical device features are supported
+    VkPhysicalDeviceFeatures physicalDeviceFeatures;
+    vkGetPhysicalDeviceFeatures(vk.physicalDevice, &physicalDeviceFeatures);
+    if (!physicalDeviceFeatures.shaderStorageImageMultisample)
+    {
+      return false;
+    }
+
+    VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    VkPhysicalDeviceMultiviewFeatures physicalDeviceMultiviewFeatures{
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES
+    };
+    physicalDeviceFeatures2.pNext = &physicalDeviceMultiviewFeatures;
+    vkGetPhysicalDeviceFeatures2(vk.physicalDevice, &physicalDeviceFeatures2);
+    if (!physicalDeviceMultiviewFeatures.multiview)
+    {
+      return false;
+    }
+
+    physicalDeviceFeatures.shaderStorageImageMultisample = VK_TRUE; // Needed for some OpenXR implementations
+    physicalDeviceMultiviewFeatures.multiview = VK_TRUE;            // Needed for stereo rendering
+
+    constexpr float queuePriority = 1.0f;
+
+    std::vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos;
+
+    VkDeviceQueueCreateInfo deviceQueueCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
+    deviceQueueCreateInfo.queueFamilyIndex = vk.drawQueueFamilyIndex;
+    deviceQueueCreateInfo.queueCount = 1u;
+    deviceQueueCreateInfo.pQueuePriorities = &queuePriority;
+    deviceQueueCreateInfos.push_back(deviceQueueCreateInfo);
+
+    if (vk.drawQueueFamilyIndex != vk.presentQueueFamilyIndex)
+    {
+      deviceQueueCreateInfo.queueFamilyIndex = vk.presentQueueFamilyIndex;
+      deviceQueueCreateInfos.push_back(deviceQueueCreateInfo);
+    }
+
+    VkDeviceCreateInfo deviceCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
+    deviceCreateInfo.pNext = &physicalDeviceMultiviewFeatures;
+    deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(vulkanDeviceExtensions.size());
+    deviceCreateInfo.ppEnabledExtensionNames = vulkanDeviceExtensions.data();
+    deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
+    deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(deviceQueueCreateInfos.size());
+    deviceCreateInfo.pQueueCreateInfos = deviceQueueCreateInfos.data();
+    if (vkCreateDevice(vk.physicalDevice, &deviceCreateInfo, nullptr, &vk.device) != VK_SUCCESS)
+    {
+      return false;
+    }
+  }
+
+  // Check the graphics requirements for Vulkan
+  XrGraphicsRequirementsVulkanKHR graphicsRequirements{ XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR };
+  result = xr.getVulkanGraphicsRequirementsKHR(xr.instance, xr.systemId, &graphicsRequirements);
+  if (XR_FAILED(result))
+  {
+    return false;
+  }
+
+  // Retrieve the queues
+  vkGetDeviceQueue(vk.device, vk.drawQueueFamilyIndex, 0u, &vk.drawQueue);
+  if (!vk.drawQueue)
+  {
+    return false;
+  }
+
+  vkGetDeviceQueue(vk.device, vk.presentQueueFamilyIndex, 0u, &vk.presentQueue);
+  if (!vk.presentQueue)
+  {
+    return false;
+  }
+
+  return true;
+}
+
+void Context::sync() const
+{
+  vkDeviceWaitIdle(vk.device);
 }
 
 void Context::destroy() const
@@ -443,6 +695,8 @@ void Context::destroy() const
   xrDestroyInstance(xr.instance);
 
   // Clean up Vulkan
+  vkDestroyDevice(vk.device, nullptr);
+
 #ifdef DEBUG
   vk.destroyDebugUtilsMessengerEXT(vk.instance, vk.debugUtilsMessenger, nullptr);
 #endif
@@ -478,4 +732,24 @@ VkInstance Context::getVkInstance() const
 VkPhysicalDevice Context::getVkPhysicalDevice() const
 {
   return vk.physicalDevice;
+}
+
+uint32_t Context::getVkDrawQueueFamilyIndex() const
+{
+  return vk.drawQueueFamilyIndex;
+}
+
+VkDevice Context::getVkDevice() const
+{
+  return vk.device;
+}
+
+VkQueue Context::getVkDrawQueue() const
+{
+  return vk.drawQueue;
+}
+
+VkQueue Context::getVkPresentQueue() const
+{
+  return vk.presentQueue;
 }
