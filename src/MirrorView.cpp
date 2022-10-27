@@ -12,7 +12,7 @@
 
 namespace
 {
-inline constexpr const char* windowTitle = "xrvk";
+inline constexpr const char* windowTitle = "OpenXR Vulkan Example";
 inline constexpr VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB;
 inline constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 inline constexpr size_t mirrorEyeIndex = 1u; // Eye index to mirror, 0 = left, 1 = right

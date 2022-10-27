@@ -1,4 +1,4 @@
-set(TARGET_NAME xrvk)
+set(TARGET_NAME openxr-vulkan-example)
 
 set(SHADER_SRC
   shaders/Basic.vert
