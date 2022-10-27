@@ -4,8 +4,11 @@
 #include "Headset.h"
 #include "RenderTarget.h"
 #include "Renderer.h"
+#include "Util.h"
 
 #include <glfw/glfw3.h>
+
+#include <sstream>
 
 namespace
 {
@@ -48,7 +51,10 @@ MirrorView::MirrorView(const Context* context) : context(context)
   window = glfwCreateWindow(width, height, windowTitle, monitor, nullptr);
   if (!window)
   {
-    error = Error::GLFW;
+    std::stringstream s;
+    s << width << "x" << height << (monitor ? " fullscreen" : " windowed");
+    util::error(Error::WindowFailure, s.str());
+    valid = false;
     return;
   }
 
@@ -60,7 +66,8 @@ MirrorView::MirrorView(const Context* context) : context(context)
   VkResult result = glfwCreateWindowSurface(context->getVkInstance(), window, nullptr, &surface);
   if (result != VK_SUCCESS)
   {
-    error = Error::GLFW;
+    util::error(Error::GenericGLFW);
+    valid = false;
     return;
   }
 }
@@ -84,7 +91,12 @@ bool MirrorView::connect(const Headset* headset, const Renderer* renderer)
   this->headset = headset;
   this->renderer = renderer;
 
-  return recreateSwapchain();
+  if (!recreateSwapchain())
+  {
+    return false;
+  }
+
+  return true;
 }
 
 void MirrorView::processWindowEvents() const
@@ -233,9 +245,9 @@ void MirrorView::present()
   }
 }
 
-MirrorView::Error MirrorView::getError() const
+bool MirrorView::isValid() const
 {
-  return error;
+  return valid;
 }
 
 bool MirrorView::windowShouldClose() const
@@ -259,11 +271,13 @@ bool MirrorView::recreateSwapchain()
   {
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities) != VK_SUCCESS)
     {
+      util::error(Error::GenericVulkan);
       return false;
     }
 
     if (!(surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT))
     {
+      util::error(Error::GenericVulkan);
       return false;
     }
 
@@ -298,6 +312,7 @@ bool MirrorView::recreateSwapchain()
     uint32_t surfaceFormatCount = 0u;
     if (vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, nullptr) != VK_SUCCESS)
     {
+      util::error(Error::GenericVulkan);
       return false;
     }
 
@@ -305,6 +320,7 @@ bool MirrorView::recreateSwapchain()
     if (vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data()) !=
         VK_SUCCESS)
     {
+      util::error(Error::GenericVulkan);
       return false;
     }
 
@@ -322,6 +338,7 @@ bool MirrorView::recreateSwapchain()
 
     if (!surfaceFormatFound)
     {
+      util::error(Error::FeatureNotSupported, "Vulkan swapchain color format");
       return false;
     }
   }
@@ -350,6 +367,7 @@ bool MirrorView::recreateSwapchain()
   swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   if (vkCreateSwapchainKHR(vkDevice, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     return false;
   }
 
@@ -357,12 +375,14 @@ bool MirrorView::recreateSwapchain()
   uint32_t swapchainImageCount = 0u;
   if (vkGetSwapchainImagesKHR(vkDevice, swapchain, &swapchainImageCount, nullptr) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     return false;
   }
 
   swapchainImages.resize(swapchainImageCount);
   if (vkGetSwapchainImagesKHR(vkDevice, swapchain, &swapchainImageCount, swapchainImages.data()) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     return false;
   }
 

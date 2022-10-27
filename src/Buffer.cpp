@@ -1,6 +1,9 @@
 #include "Buffer.h"
 
+#include "Util.h"
+
 #include <cstring>
+#include <sstream>
 
 Buffer::Buffer(const VkDevice device,
                const VkPhysicalDevice physicalDevice,
@@ -16,6 +19,7 @@ Buffer::Buffer(const VkDevice device,
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   if (vkCreateBuffer(device, &bufferCreateInfo, nullptr, &buffer) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
@@ -42,6 +46,7 @@ Buffer::Buffer(const VkDevice device,
 
   if (!memoryTypeFound)
   {
+    util::error(Error::FeatureNotSupported, "Suitable buffer memory type");
     valid = false;
     return;
   }
@@ -51,12 +56,16 @@ Buffer::Buffer(const VkDevice device,
   memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
   if (vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &deviceMemory) != VK_SUCCESS)
   {
+    std::stringstream s;
+    s << memoryRequirements.size << " bytes for buffer";
+    util::error(Error::OutOfMemory, s.str());
     valid = false;
     return;
   }
 
   if (vkBindBufferMemory(device, buffer, deviceMemory, 0u) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
@@ -88,6 +97,7 @@ bool Buffer::copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     return false;
   }
 
@@ -97,6 +107,7 @@ bool Buffer::copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue
 
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     return false;
   }
 
@@ -105,11 +116,13 @@ bool Buffer::copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue
   submitInfo.pCommandBuffers = &commandBuffer;
   if (vkQueueSubmit(queue, 1u, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     return false;
   }
 
   if (vkQueueWaitIdle(queue) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     return false;
   }
 
@@ -122,6 +135,7 @@ void* Buffer::map() const
   VkResult result = vkMapMemory(device, deviceMemory, 0u, size, 0, &data);
   if (result != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     return nullptr;
   }
 

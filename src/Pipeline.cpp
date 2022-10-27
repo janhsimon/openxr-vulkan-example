@@ -3,6 +3,7 @@
 #include "Util.h"
 
 #include <array>
+#include <sstream>
 
 Pipeline::Pipeline(VkDevice device,
                    VkPipelineLayout pipelineLayout,
@@ -16,6 +17,9 @@ Pipeline::Pipeline(VkDevice device,
   VkShaderModule vertexShaderModule;
   if (!util::loadShaderFromFile(device, vertexFilename, vertexShaderModule))
   {
+    std::stringstream s;
+    s << "Vertex shader \"" << vertexFilename << "\"";
+    util::error(Error::FileMissing, s.str().c_str());
     valid = false;
     return;
   }
@@ -23,6 +27,9 @@ Pipeline::Pipeline(VkDevice device,
   VkShaderModule fragmentShaderModule;
   if (!util::loadShaderFromFile(device, fragmentFilename, fragmentShaderModule))
   {
+    std::stringstream s;
+    s << "Fragment shader \"" << fragmentFilename << "\"";
+    util::error(Error::FileMissing, s.str().c_str());
     valid = false;
     return;
   }
@@ -123,6 +130,7 @@ Pipeline::Pipeline(VkDevice device,
   graphicsPipelineCreateInfo.renderPass = renderPass;
   if (vkCreateGraphicsPipelines(device, nullptr, 1u, &graphicsPipelineCreateInfo, nullptr, &pipeline) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }

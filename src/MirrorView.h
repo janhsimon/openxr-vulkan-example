@@ -12,13 +12,6 @@ class Renderer;
 class MirrorView final
 {
 public:
-  enum class Error
-  {
-    Success,
-    GLFW,
-    Vulkan
-  };
-
   MirrorView(const Context* context);
 
   void destroy() const; // Only call when construction succeeded
@@ -30,12 +23,12 @@ public:
   bool render(uint32_t swapchainImageIndex);
   void present();
 
-  Error getError() const;
+  bool isValid() const;
   bool windowShouldClose() const;
   VkSurfaceKHR getSurface() const;
 
 private:
-  Error error = Error::Success;
+  bool valid = true;
 
   const Context* context = nullptr;
   const Headset* headset = nullptr;

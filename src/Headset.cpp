@@ -5,6 +5,7 @@
 #include "Util.h"
 
 #include <array>
+#include <sstream>
 
 namespace
 {
@@ -74,7 +75,8 @@ Headset::Headset(const Context* context) : context(context)
     renderPassCreateInfo.pSubpasses = &subpassDescription;
     if (vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      util::error(Error::GenericVulkan);
+      valid = false;
       return;
     }
   }
@@ -98,7 +100,8 @@ Headset::Headset(const Context* context) : context(context)
   XrResult result = xrCreateSession(xrInstance, &sessionCreateInfo, &session);
   if (XR_FAILED(result))
   {
-    error = Error::OpenXR;
+    util::error(Error::GenericOpenXR);
+    valid = false;
     return;
   }
 
@@ -109,7 +112,8 @@ Headset::Headset(const Context* context) : context(context)
   result = xrCreateReferenceSpace(session, &referenceSpaceCreateInfo, &space);
   if (XR_FAILED(result))
   {
-    error = Error::OpenXR;
+    util::error(Error::GenericOpenXR);
+    valid = false;
     return;
   }
 
@@ -120,7 +124,8 @@ Headset::Headset(const Context* context) : context(context)
                                              reinterpret_cast<uint32_t*>(&eyeCount), nullptr);
   if (XR_FAILED(result))
   {
-    error = Error::OpenXR;
+    util::error(Error::GenericOpenXR);
+    valid = false;
     return;
   }
 
@@ -137,7 +142,8 @@ Headset::Headset(const Context* context) : context(context)
                                       reinterpret_cast<uint32_t*>(&eyeCount), eyeImageInfos.data());
   if (XR_FAILED(result))
   {
-    error = Error::OpenXR;
+    util::error(Error::GenericOpenXR);
+    valid = false;
     return;
   }
 
@@ -155,7 +161,8 @@ Headset::Headset(const Context* context) : context(context)
     result = xrEnumerateSwapchainFormats(session, 0u, &formatCount, nullptr);
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
 
@@ -163,7 +170,8 @@ Headset::Headset(const Context* context) : context(context)
     result = xrEnumerateSwapchainFormats(session, formatCount, &formatCount, formats.data());
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
 
@@ -179,7 +187,8 @@ Headset::Headset(const Context* context) : context(context)
 
     if (!formatFound)
     {
-      error = Error::OpenXR;
+      util::error(Error::FeatureNotSupported, "OpenXR swapchain color format");
+      valid = false;
       return;
     }
   }
@@ -204,7 +213,8 @@ Headset::Headset(const Context* context) : context(context)
     imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     if (vkCreateImage(device, &imageCreateInfo, nullptr, &depthImage) != VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      util::error(Error::GenericVulkan);
+      valid = false;
       return;
     }
 
@@ -231,7 +241,8 @@ Headset::Headset(const Context* context) : context(context)
 
     if (!memoryTypeFound)
     {
-      error = Error::Vulkan;
+      util::error(Error::FeatureNotSupported, "Suitable depth buffer memory type");
+      valid = false;
       return;
     }
 
@@ -240,13 +251,17 @@ Headset::Headset(const Context* context) : context(context)
     memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
     if (vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &depthMemory) != VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      std::stringstream s;
+      s << memoryRequirements.size << " bytes for depth buffer";
+      util::error(Error::OutOfMemory, s.str());
+      valid = false;
       return;
     }
 
     if (vkBindImageMemory(device, depthImage, depthMemory, 0) != VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      util::error(Error::GenericVulkan);
+      valid = false;
       return;
     }
 
@@ -264,7 +279,8 @@ Headset::Headset(const Context* context) : context(context)
     imageViewCreateInfo.subresourceRange.levelCount = 1u;
     if (vkCreateImageView(device, &imageViewCreateInfo, nullptr, &depthImageView) != VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      util::error(Error::GenericVulkan);
+      valid = false;
       return;
     }
   }
@@ -286,7 +302,8 @@ Headset::Headset(const Context* context) : context(context)
     result = xrCreateSwapchain(session, &swapchainCreateInfo, &swapchain);
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
 
@@ -295,7 +312,8 @@ Headset::Headset(const Context* context) : context(context)
     result = xrEnumerateSwapchainImages(swapchain, 0u, &swapchainImageCount, nullptr);
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
 
@@ -312,7 +330,8 @@ Headset::Headset(const Context* context) : context(context)
       xrEnumerateSwapchainImages(swapchain, static_cast<uint32_t>(swapchainImages.size()), &swapchainImageCount, data);
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
 
@@ -326,7 +345,7 @@ Headset::Headset(const Context* context) : context(context)
       renderTarget = new RenderTarget(device, image, depthImageView, eyeResolution, colorFormat, renderPass, 2u);
       if (!renderTarget->isValid())
       {
-        error = Error::Vulkan;
+        valid = false;
         return;
       }
     }
@@ -389,7 +408,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     switch (buffer.type)
     {
     case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
-      onSessionStateExiting();
+      exitSession();
       break;
     case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:
     {
@@ -398,21 +417,21 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
       if (event->state == XR_SESSION_STATE_READY)
       {
-        if (!onSessionStateReady())
+        if (!beginSession())
         {
           return BeginFrameResult::Error;
         }
       }
       else if (event->state == XR_SESSION_STATE_STOPPING)
       {
-        if (!onSessionStateStopping())
+        if (!endSession())
         {
           return BeginFrameResult::Error;
         }
       }
       else if (event->state == XR_SESSION_STATE_LOSS_PENDING || event->state == XR_SESSION_STATE_EXITING)
       {
-        if (!onSessionStateExiting())
+        if (!exitSession())
         {
           return BeginFrameResult::Error;
         }
@@ -437,6 +456,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   XrResult result = xrWaitFrame(session, &frameWaitInfo, &frameState);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return BeginFrameResult::Error;
   }
 
@@ -445,6 +465,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   result = xrBeginFrame(session, &frameBeginInfo);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return BeginFrameResult::Error;
   }
 
@@ -466,11 +487,13 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
                          eyePoses.data());
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return BeginFrameResult::Error;
   }
 
   if (viewCount != eyeCount)
   {
+    util::error(Error::GenericOpenXR);
     return BeginFrameResult::Error;
   }
 
@@ -494,6 +517,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   result = xrAcquireSwapchainImage(swapchain, &swapchainImageAcquireInfo, &swapchainImageIndex);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return BeginFrameResult::Error;
   }
 
@@ -503,6 +527,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   result = xrWaitSwapchainImage(swapchain, &swapchainImageWaitInfo);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return BeginFrameResult::Error;
   }
 
@@ -546,9 +571,9 @@ void Headset::endFrame() const
   }
 }
 
-Headset::Error Headset::getError() const
+bool Headset::isValid() const
 {
-  return error;
+  return valid;
 }
 
 VkRenderPass Headset::getRenderPass() const
@@ -582,7 +607,7 @@ RenderTarget* Headset::getRenderTarget(size_t swapchainImageIndex) const
   return swapchainRenderTargets.at(swapchainImageIndex);
 }
 
-bool Headset::onSessionStateReady() const
+bool Headset::beginSession() const
 {
   // Start the session
   XrSessionBeginInfo sessionBeginInfo{ XR_TYPE_SESSION_BEGIN_INFO };
@@ -590,30 +615,33 @@ bool Headset::onSessionStateReady() const
   const XrResult result = xrBeginSession(session, &sessionBeginInfo);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return false;
   }
 
   return true;
 }
 
-bool Headset::onSessionStateStopping() const
+bool Headset::endSession() const
 {
   // End the session
   const XrResult result = xrEndSession(session);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return false;
   }
 
   return true;
 }
 
-bool Headset::onSessionStateExiting() const
+bool Headset::exitSession() const
 {
   // Destroy the session
   XrResult result = xrDestroySession(session);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return false;
   }
 
@@ -621,6 +649,7 @@ bool Headset::onSessionStateExiting() const
   result = xrDestroyInstance(context->getXrInstance());
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return false;
   }
 

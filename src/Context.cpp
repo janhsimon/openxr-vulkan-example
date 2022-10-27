@@ -4,6 +4,8 @@
 
 #include <glfw/glfw3.h>
 
+#include <sstream>
+
 #ifdef DEBUG
   #include <array>
   #include <iostream>
@@ -20,13 +22,15 @@ Context::Context()
   // Initialize GLFW
   if (!glfwInit())
   {
-    error = Error::GLFW;
+    util::error(Error::GenericGLFW);
+    valid = false;
     return;
   }
 
   if (!glfwVulkanSupported())
   {
-    error = Error::GLFW;
+    util::error(Error::VulkanNotSupported);
+    valid = false;
     return;
   }
 
@@ -37,7 +41,8 @@ Context::Context()
     XrResult result = xrEnumerateInstanceExtensionProperties(nullptr, 0u, &instanceExtensionCount, nullptr);
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
 
@@ -52,7 +57,8 @@ Context::Context()
                                                     supportedOpenXRInstanceExtensions.data());
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
   }
@@ -88,7 +94,10 @@ Context::Context()
 
       if (!extensionSupported)
       {
-        error = Error::OpenXR;
+        std::stringstream s;
+        s << "OpenXR instance extension \"" << extension << "\"";
+        util::error(Error::FeatureNotSupported, s.str());
+        valid = false;
         return;
       }
     }
@@ -100,7 +109,8 @@ Context::Context()
     const XrResult result = xrCreateInstance(&instanceCreateInfo, &xrInstance);
     if (XR_FAILED(result))
     {
-      error = Error::NoHeadsetDetected;
+      util::error(Error::HeadsetNotConnected);
+      valid = false;
       return;
     }
   }
@@ -109,28 +119,32 @@ Context::Context()
   if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanInstanceExtensionsKHR",
                                      reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanInstanceExtensionsKHR)))
   {
-    error = Error::OpenXR;
+    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrGetVulkanInstanceExtensionsKHR\"");
+    valid = false;
     return;
   }
 
   if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanGraphicsDeviceKHR",
                                      reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsDeviceKHR)))
   {
-    error = Error::OpenXR;
+    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrGetVulkanGraphicsDeviceKHR\"");
+    valid = false;
     return;
   }
 
   if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanDeviceExtensionsKHR",
                                      reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanDeviceExtensionsKHR)))
   {
-    error = Error::OpenXR;
+    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrGetVulkanDeviceExtensionsKHR\"");
+    valid = false;
     return;
   }
 
   if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanGraphicsRequirementsKHR",
                                      reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsRequirementsKHR)))
   {
-    error = Error::OpenXR;
+    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrGetVulkanGraphicsRequirementsKHR\"");
+    valid = false;
     return;
   }
 
@@ -140,14 +154,16 @@ Context::Context()
     if (!util::loadXrExtensionFunction(xrInstance, "xrCreateDebugUtilsMessengerEXT",
                                        reinterpret_cast<PFN_xrVoidFunction*>(&xrCreateDebugUtilsMessengerEXT)))
     {
-      error = Error::OpenXR;
+      util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrCreateDebugUtilsMessengerEXT\"");
+      valid = false;
       return;
     }
 
     if (!util::loadXrExtensionFunction(xrInstance, "xrDestroyDebugUtilsMessengerEXT",
                                        reinterpret_cast<PFN_xrVoidFunction*>(&xrDestroyDebugUtilsMessengerEXT)))
     {
-      error = Error::OpenXR;
+      util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrDestroyDebugUtilsMessengerEXT\"");
+      valid = false;
       return;
     }
 
@@ -179,7 +195,8 @@ Context::Context()
       xrCreateDebugUtilsMessengerEXT(xrInstance, &debugUtilsMessengerCreateInfo, &xrDebugUtilsMessenger);
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
   }
@@ -191,7 +208,8 @@ Context::Context()
   XrResult result = xrGetSystem(xrInstance, &systemGetInfo, &systemId);
   if (XR_FAILED(result))
   {
-    error = Error::NoHeadsetDetected;
+    util::error(Error::HeadsetNotConnected);
+    valid = false;
     return;
   }
 
@@ -201,7 +219,8 @@ Context::Context()
     result = xrEnumerateEnvironmentBlendModes(xrInstance, systemId, viewType, 0u, &environmentBlendModeCount, nullptr);
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
 
@@ -210,7 +229,8 @@ Context::Context()
                                               &environmentBlendModeCount, supportedEnvironmentBlendModes.data());
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
 
@@ -226,7 +246,8 @@ Context::Context()
 
     if (!modeFound)
     {
-      error = Error::OpenXR;
+      util::error(Error::FeatureNotSupported, "Environment blend mode");
+      valid = false;
       return;
     }
   }
@@ -237,7 +258,8 @@ Context::Context()
     uint32_t instanceExtensionCount;
     if (vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr) != VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      util::error(Error::GenericVulkan);
+      valid = false;
       return;
     }
 
@@ -245,7 +267,8 @@ Context::Context()
     if (vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount,
                                                supportedVulkanInstanceExtensions.data()) != VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      util::error(Error::GenericVulkan);
+      valid = false;
       return;
     }
   }
@@ -257,7 +280,8 @@ Context::Context()
     const char** buffer = glfwGetRequiredInstanceExtensions(&requiredExtensionCount);
     if (!buffer)
     {
-      error = Error::GLFW;
+      util::error(Error::GenericGLFW);
+      valid = false;
       return;
     }
 
@@ -273,7 +297,8 @@ Context::Context()
     result = xrGetVulkanInstanceExtensionsKHR(xrInstance, systemId, 0u, &count, nullptr);
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
 
@@ -282,7 +307,8 @@ Context::Context()
     result = xrGetVulkanInstanceExtensionsKHR(xrInstance, systemId, count, &count, buffer.data());
     if (XR_FAILED(result))
     {
-      error = Error::OpenXR;
+      util::error(Error::GenericOpenXR);
+      valid = false;
       return;
     }
 
@@ -314,7 +340,10 @@ Context::Context()
 
     if (!extensionSupported)
     {
-      error = Error::Vulkan;
+      std::stringstream s;
+      s << "Vulkan instance extension \"" << extension << "\"";
+      util::error(Error::FeatureNotSupported, s.str());
+      valid = false;
       return;
     }
   }
@@ -341,14 +370,16 @@ Context::Context()
     uint32_t instanceLayerCount;
     if (vkEnumerateInstanceLayerProperties(&instanceLayerCount, nullptr) != VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      util::error(Error::GenericVulkan);
+      valid = false;
       return;
     }
 
     supportedInstanceLayers.resize(instanceLayerCount);
     if (vkEnumerateInstanceLayerProperties(&instanceLayerCount, supportedInstanceLayers.data()) != VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      util::error(Error::GenericVulkan);
+      valid = false;
       return;
     }
 
@@ -367,7 +398,10 @@ Context::Context()
 
       if (!layerSupported)
       {
-        error = Error::Vulkan;
+        std::stringstream s;
+        s << "Vulkan instance layer \"" << layer << "\"";
+        util::error(Error::FeatureNotSupported, s.str());
+        valid = false;
         return;
       }
     }
@@ -378,7 +412,8 @@ Context::Context()
 
     if (vkCreateInstance(&instanceCreateInfo, nullptr, &vkInstance) != VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      util::error(Error::GenericVulkan);
+      valid = false;
       return;
     }
   }
@@ -390,7 +425,8 @@ Context::Context()
       util::loadVkExtensionFunction(vkInstance, "vkCreateDebugUtilsMessengerEXT"));
     if (!vkCreateDebugUtilsMessengerEXT)
     {
-      error = Error::Vulkan;
+      util::error(Error::FeatureNotSupported, "Vulkan extension function \"vkCreateDebugUtilsMessengerEXT\"");
+      valid = false;
       return;
     }
 
@@ -398,7 +434,8 @@ Context::Context()
       util::loadVkExtensionFunction(vkInstance, "vkDestroyDebugUtilsMessengerEXT"));
     if (!vkDestroyDebugUtilsMessengerEXT)
     {
-      error = Error::Vulkan;
+      util::error(Error::FeatureNotSupported, "Vulkan extension function \"vkDestroyDebugUtilsMessengerEXT\"");
+      valid = false;
       return;
     }
 
@@ -431,7 +468,8 @@ Context::Context()
     if (vkCreateDebugUtilsMessengerEXT(vkInstance, &debugUtilsMessengerCreateInfo, nullptr, &vkDebugUtilsMessenger) !=
         VK_SUCCESS)
     {
-      error = Error::Vulkan;
+      util::error(Error::GenericVulkan);
+      valid = false;
       return;
     }
   }
@@ -444,6 +482,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
   XrResult result = xrGetVulkanGraphicsDeviceKHR(xrInstance, systemId, vkInstance, &physicalDevice);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return false;
   }
 
@@ -480,6 +519,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 
     if (!drawQueueFamilyIndexFound)
     {
+      util::error(Error::FeatureNotSupported, "Graphics queue family index");
       return false;
     }
   }
@@ -511,7 +551,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
       if (vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, static_cast<uint32_t>(queueFamilyIndexCandidate),
                                                mirrorSurface, &presentSupport) != VK_SUCCESS)
       {
-        return false;
+        continue;
       }
 
       if (!presentQueueFamilyIndexFound && presentSupport)
@@ -524,6 +564,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 
     if (!presentQueueFamilyIndexFound)
     {
+      util::error(Error::FeatureNotSupported, "Present queue family index");
       return false;
     }
   }
@@ -534,6 +575,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     uint32_t deviceExtensionCount;
     if (vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionCount, nullptr) != VK_SUCCESS)
     {
+      util::error(Error::GenericVulkan);
       return false;
     }
 
@@ -541,20 +583,9 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     if (vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &deviceExtensionCount,
                                              supportedVulkanDeviceExtensions.data()) != VK_SUCCESS)
     {
+      util::error(Error::GenericVulkan);
       return false;
     }
-  }
-
-  // Load the required OpenXR extension functions
-  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanDeviceExtensionsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanDeviceExtensionsKHR)))
-  {
-    return false;
-  }
-  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanGraphicsRequirementsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsRequirementsKHR)))
-  {
-    return false;
   }
 
   // Get the required Vulkan device extensions from OpenXR
@@ -564,6 +595,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     result = xrGetVulkanDeviceExtensionsKHR(xrInstance, systemId, 0u, &count, nullptr);
     if (XR_FAILED(result))
     {
+      util::error(Error::GenericOpenXR);
       return false;
     }
 
@@ -572,6 +604,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     result = xrGetVulkanDeviceExtensionsKHR(xrInstance, systemId, count, &count, buffer.data());
     if (XR_FAILED(result))
     {
+      util::error(Error::GenericOpenXR);
       return false;
     }
 
@@ -597,6 +630,9 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 
       if (!extensionSupported)
       {
+        std::stringstream s;
+        s << "Vulkan device extension \"" << extension << "\"";
+        util::error(Error::FeatureNotSupported, s.str());
         return false;
       }
     }
@@ -609,6 +645,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     vkGetPhysicalDeviceFeatures(physicalDevice, &physicalDeviceFeatures);
     if (!physicalDeviceFeatures.shaderStorageImageMultisample)
     {
+      util::error(Error::FeatureNotSupported, "Vulkan physical device feature \"shaderStorageImageMultisample\"");
       return false;
     }
 
@@ -620,6 +657,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     vkGetPhysicalDeviceFeatures2(physicalDevice, &physicalDeviceFeatures2);
     if (!physicalDeviceMultiviewFeatures.multiview)
     {
+      util::error(Error::FeatureNotSupported, "Vulkan physical device feature \"multiview\"");
       return false;
     }
 
@@ -651,6 +689,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     deviceCreateInfo.pQueueCreateInfos = deviceQueueCreateInfos.data();
     if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS)
     {
+      util::error(Error::GenericVulkan);
       return false;
     }
   }
@@ -660,6 +699,7 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
   result = xrGetVulkanGraphicsRequirementsKHR(xrInstance, systemId, &graphicsRequirements);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return false;
   }
 
@@ -667,12 +707,14 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
   vkGetDeviceQueue(device, drawQueueFamilyIndex, 0u, &drawQueue);
   if (!drawQueue)
   {
+    util::error(Error::GenericVulkan);
     return false;
   }
 
   vkGetDeviceQueue(device, presentQueueFamilyIndex, 0u, &presentQueue);
   if (!presentQueue)
   {
+    util::error(Error::GenericVulkan);
     return false;
   }
 
@@ -703,9 +745,9 @@ void Context::destroy() const
   vkDestroyInstance(vkInstance, nullptr);
 }
 
-Context::Error Context::getError() const
+bool Context::isValid() const
 {
-  return error;
+  return valid;
 }
 
 XrViewConfigurationType Context::getXrViewType() const

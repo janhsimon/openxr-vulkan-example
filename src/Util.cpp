@@ -2,8 +2,57 @@
 
 #include <glm/gtx/quaternion.hpp>
 
+#include <boxer/boxer.h>
+
 #include <fstream>
 #include <sstream>
+
+void util::error(Error error, const std::string& details)
+{
+  std::stringstream s;
+
+  switch (error)
+  {
+  case Error::FeatureNotSupported:
+    s << "Required feature is not supported";
+    break;
+  case Error::FileMissing:
+    s << "Failed to find file";
+    break;
+  case Error::GenericGLFW:
+    s << "Program encountered a generic GLFW error";
+    break;
+  case Error::GenericOpenXR:
+    s << "Program encountered a generic OpenXR error";
+    break;
+  case Error::GenericVulkan:
+    s << "Program encountered a generic Vulkan error";
+    break;
+  case Error::HeadsetNotConnected:
+    s << "No headset detected.\nPlease make sure that your headset is connected and running";
+    break;
+  case Error::OutOfMemory:
+    s << "Program ran out of memory";
+    break;
+  case Error::VulkanNotSupported:
+    s << "Vulkan is not supported";
+    break;
+  case Error::WindowFailure:
+    s << "Failed to create window";
+    break;
+  }
+
+  if (details.empty())
+  {
+    s << ".";
+  }
+  else
+  {
+    s << ": " << details << ".";
+  }
+
+  boxer::show(s.str().c_str(), "Error", boxer::Style::Error);
+}
 
 bool util::loadXrExtensionFunction(XrInstance instance, const std::string& name, PFN_xrVoidFunction* function)
 {

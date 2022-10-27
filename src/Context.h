@@ -9,22 +9,13 @@
 class Context final
 {
 public:
-  enum class Error
-  {
-    Success,
-    NoHeadsetDetected,
-    GLFW,
-    OpenXR,
-    Vulkan
-  };
-
   Context();
 
   bool createDevice(VkSurfaceKHR mirrorSurface);
   void sync() const;
   void destroy() const; // Only call when construction and createDevice() succeeded
 
-  Error getError() const;
+  bool isValid() const;
 
   XrViewConfigurationType getXrViewType() const;
   XrInstance getXrInstance() const;
@@ -38,7 +29,7 @@ public:
   VkQueue getVkPresentQueue() const;
 
 private:
-  Error error = Error::Success;
+  bool valid = true;
 
   // Extension function pointers
   PFN_xrGetVulkanInstanceExtensionsKHR xrGetVulkanInstanceExtensionsKHR = nullptr;

@@ -16,13 +16,6 @@ class RenderTarget;
 class Headset final
 {
 public:
-  enum class Error
-  {
-    Success,
-    OpenXR,
-    Vulkan
-  };
-
   Headset(const Context* context);
 
   void destroy() const; // Only call when construction succeeded
@@ -37,7 +30,7 @@ public:
   BeginFrameResult beginFrame(uint32_t& swapchainImageIndex);
   void endFrame() const;
 
-  Error getError() const;
+  bool isValid() const;
   VkRenderPass getRenderPass() const;
   size_t getEyeCount() const;
   VkExtent2D getEyeResolution(size_t eyeIndex) const;
@@ -46,7 +39,7 @@ public:
   RenderTarget* getRenderTarget(size_t swapchainImageIndex) const;
 
 private:
-  Error error = Error::Success;
+  bool valid = true;
 
   const Context* context = nullptr;
 
@@ -74,7 +67,7 @@ private:
   VkDeviceMemory depthMemory = nullptr;
   VkImageView depthImageView = nullptr;
 
-  bool onSessionStateReady() const;
-  bool onSessionStateStopping() const;
-  bool onSessionStateExiting() const;
+  bool beginSession() const;
+  bool endSession() const;
+  bool exitSession() const;
 };

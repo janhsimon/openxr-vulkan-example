@@ -3,73 +3,39 @@
 #include "MirrorView.h"
 #include "Renderer.h"
 
-#include <boxer/boxer.h>
-
 int main()
 {
   Context context;
-  if (context.getError() == Context::Error::NoHeadsetDetected)
+  if (!context.isValid())
   {
-    boxer::show("No headset detected.\nPlease make sure that your headset is connected and running.", "Error",
-                boxer::Style::Error);
-    return EXIT_FAILURE;
-  }
-  else if (context.getError() == Context::Error::GLFW)
-  {
-    boxer::show("Context encountered generic GLFW error.", "Error", boxer::Style::Error);
-    return EXIT_FAILURE;
-  }
-  else if (context.getError() == Context::Error::OpenXR)
-  {
-    boxer::show("Context encountered generic OpenXR error.", "Error", boxer::Style::Error);
-    return EXIT_FAILURE;
-  }
-  else if (context.getError() == Context::Error::Vulkan)
-  {
-    boxer::show("Context encountered generic Vulkan error.", "Error", boxer::Style::Error);
     return EXIT_FAILURE;
   }
 
   MirrorView mirrorView(&context);
-  if (mirrorView.getError() == MirrorView::Error::GLFW)
+  if (!mirrorView.isValid())
   {
-    boxer::show("Mirror view encountered generic GLFW error.", "Error", boxer::Style::Error);
-    return EXIT_FAILURE;
-  }
-  else if (mirrorView.getError() == MirrorView::Error::Vulkan)
-  {
-    boxer::show("Mirror view encountered generic Vulkan error.", "Error", boxer::Style::Error);
     return EXIT_FAILURE;
   }
 
   if (!context.createDevice(mirrorView.getSurface()))
   {
-    boxer::show("Context encountered generic error.", "Error", boxer::Style::Error);
     return EXIT_FAILURE;
   }
 
   Headset headset(&context);
-  if (headset.getError() == Headset::Error::OpenXR)
+  if (!headset.isValid())
   {
-    boxer::show("Headset encountered generic OpenXR error.", "Error", boxer::Style::Error);
-    return EXIT_FAILURE;
-  }
-  else if (headset.getError() == Headset::Error::Vulkan)
-  {
-    boxer::show("Headset encountered generic Vulkan error.", "Error", boxer::Style::Error);
     return EXIT_FAILURE;
   }
 
   Renderer renderer(&context, &headset);
   if (!renderer.isValid())
   {
-    boxer::show("Renderer encountered generic Vulkan error.", "Error", boxer::Style::Error);
     return EXIT_FAILURE;
   }
 
   if (!mirrorView.connect(&headset, &renderer))
   {
-    boxer::show("Mirror view encountered generic Vulkan error.", "Error", boxer::Style::Error);
     return EXIT_FAILURE;
   }
 

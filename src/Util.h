@@ -11,8 +11,25 @@
 #include <string>
 #include <vector>
 
+// All the things that can go wrong
+enum class Error
+{
+  FeatureNotSupported,
+  FileMissing,
+  GenericGLFW,
+  GenericOpenXR,
+  GenericVulkan,
+  HeadsetNotConnected,
+  OutOfMemory,
+  VulkanNotSupported,
+  WindowFailure
+};
+
 namespace util
 {
+// Reports an error with optional details through a system-native message box
+void error(Error error, const std::string& details = "");
+
 // Loads an OpenXR extension function by 'name' into 'function', returns false on error
 bool loadXrExtensionFunction(XrInstance instance, const std::string& name, PFN_xrVoidFunction* function);
 

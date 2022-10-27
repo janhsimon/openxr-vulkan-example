@@ -5,6 +5,7 @@
 #include "Headset.h"
 #include "Pipeline.h"
 #include "RenderTarget.h"
+#include "Util.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -66,6 +67,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   commandPoolCreateInfo.queueFamilyIndex = context->getVkDrawQueueFamilyIndex();
   if (vkCreateCommandPool(vkDevice, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
@@ -77,6 +79,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   commandBufferAllocateInfo.commandBufferCount = 1u;
   if (vkAllocateCommandBuffers(vkDevice, &commandBufferAllocateInfo, &commandBuffer) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
@@ -85,12 +88,14 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
   if (vkCreateSemaphore(vkDevice, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
 
   if (vkCreateSemaphore(vkDevice, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
@@ -100,6 +105,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
   if (vkCreateFence(vkDevice, &fenceCreateInfo, nullptr, &inFlightFence) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
@@ -108,6 +114,11 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   uniformBuffer = new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                              static_cast<VkDeviceSize>(sizeof(UniformBufferObject)));
+  if (!uniformBuffer->isValid())
+  {
+    valid = false;
+    return;
+  }
 
   // Create a descriptor set layout
   VkDescriptorSetLayoutBinding descriptorSetLayoutBinding{};
@@ -122,6 +133,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   if (vkCreateDescriptorSetLayout(vkDevice, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) !=
       VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
@@ -137,6 +149,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   descriptorPoolCreateInfo.maxSets = 1u;
   if (vkCreateDescriptorPool(vkDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
@@ -148,6 +161,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
   if (vkAllocateDescriptorSets(vkDevice, &descriptorSetAllocateInfo, &descriptorSet) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
@@ -172,6 +186,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   pipelineLayoutCreateInfo.setLayoutCount = 1u;
   if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
   {
+    util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
