@@ -11,8 +11,7 @@ class Renderer final
 {
 public:
   Renderer(const Context* context, const Headset* headset);
-
-  void destroy() const; // Only call when construction succeeded
+  ~Renderer();
 
   void render(size_t swapchainImageIndex) const;
   void submit() const;

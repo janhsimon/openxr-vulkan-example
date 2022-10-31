@@ -11,8 +11,7 @@ public:
          VkMemoryPropertyFlags memoryProperties,
          VkDeviceSize size,
          const void* data = nullptr);
-
-  void destroy() const; // Only call when construction succeeded
+  ~Buffer();
 
   bool copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue queue) const;
   void* map() const;

@@ -10,10 +10,10 @@ class Context final
 {
 public:
   Context();
+  ~Context();
 
   bool createDevice(VkSurfaceKHR mirrorSurface);
   void sync() const;
-  void destroy() const; // Only call when construction and createDevice() succeeded
 
   bool isValid() const;
 

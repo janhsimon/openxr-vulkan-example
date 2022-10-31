@@ -52,7 +52,7 @@ RenderTarget::RenderTarget(VkDevice device,
   }
 }
 
-void RenderTarget::destroy() const
+RenderTarget::~RenderTarget()
 {
   vkDestroyFramebuffer(device, framebuffer, nullptr);
   vkDestroyImageView(device, imageView, nullptr);

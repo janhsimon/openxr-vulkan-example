@@ -17,8 +17,7 @@ class Headset final
 {
 public:
   Headset(const Context* context);
-
-  void destroy() const; // Only call when construction succeeded
+  ~Headset();
 
   enum class BeginFrameResult
   {

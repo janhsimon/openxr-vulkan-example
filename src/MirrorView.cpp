@@ -72,7 +72,7 @@ MirrorView::MirrorView(const Context* context) : context(context)
   }
 }
 
-void MirrorView::destroy() const
+MirrorView::~MirrorView()
 {
   vkDestroySwapchainKHR(context->getVkDevice(), swapchain, nullptr);
   vkDestroySurfaceKHR(context->getVkInstance(), surface, nullptr);

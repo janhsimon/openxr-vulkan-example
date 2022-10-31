@@ -12,8 +12,7 @@ public:
                VkFormat format,
                VkRenderPass renderPass,
                uint32_t layerCount);
-
-  void destroy() const; // Only call when construction succeeded
+  ~RenderTarget();
 
   bool isValid() const;
   VkImage getImage() const;

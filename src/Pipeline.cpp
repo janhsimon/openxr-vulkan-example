@@ -140,7 +140,7 @@ Pipeline::Pipeline(VkDevice device,
   vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
 }
 
-void Pipeline::destroy() const
+Pipeline::~Pipeline()
 {
   vkDestroyPipeline(device, pipeline, nullptr);
 }

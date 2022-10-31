@@ -259,7 +259,6 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     }
 
     // Clean up the staging buffer
-    stagingBuffer->destroy();
     delete stagingBuffer;
   }
 
@@ -294,23 +293,15 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     }
 
     // Clean up the staging buffer
-    stagingBuffer->destroy();
     delete stagingBuffer;
   }
 }
 
-void Renderer::destroy() const
+Renderer::~Renderer()
 {
-  indexBuffer->destroy();
   delete indexBuffer;
-
-  vertexBuffer->destroy();
   delete vertexBuffer;
-
-  cubePipeline->destroy();
   delete cubePipeline;
-
-  gridPipeline->destroy();
   delete gridPipeline;
 
   const VkDevice vkDevice = context->getVkDevice();
@@ -319,7 +310,6 @@ void Renderer::destroy() const
   vkDestroyDescriptorPool(vkDevice, descriptorPool, nullptr);
   vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout, nullptr);
 
-  uniformBuffer->destroy();
   delete uniformBuffer;
 
   vkDestroyFence(vkDevice, inFlightFence, nullptr);

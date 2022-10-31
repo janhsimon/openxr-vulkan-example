@@ -373,7 +373,7 @@ Headset::Headset(const Context* context) : context(context)
   eyeProjectionMatrices.resize(eyeCount);
 }
 
-void Headset::destroy() const
+Headset::~Headset()
 {
   // Clean up OpenXR
   xrEndSession(session);
@@ -381,7 +381,6 @@ void Headset::destroy() const
 
   for (const RenderTarget* renderTarget : swapchainRenderTargets)
   {
-    renderTarget->destroy();
     delete renderTarget;
   }
 

@@ -15,8 +15,7 @@ public:
            const std::string& fragmentFilename,
            const std::vector<VkVertexInputBindingDescription>& vertexInputBindingDescriptions,
            const std::vector<VkVertexInputAttributeDescription>& vertexInputAttributeDescriptions);
-
-  void destroy() const; // Only call when construction succeeded
+  ~Pipeline();
 
   void bind(VkCommandBuffer commandBuffer) const;
 

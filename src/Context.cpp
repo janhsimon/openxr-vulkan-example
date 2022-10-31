@@ -476,6 +476,25 @@ Context::Context()
 #endif
 }
 
+Context::~Context()
+{
+  // Clean up OpenXR
+#ifdef DEBUG
+  xrDestroyDebugUtilsMessengerEXT(xrDebugUtilsMessenger);
+#endif
+
+  xrDestroyInstance(xrInstance);
+
+  // Clean up Vulkan
+  vkDestroyDevice(device, nullptr);
+
+#ifdef DEBUG
+  vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugUtilsMessenger, nullptr);
+#endif
+
+  vkDestroyInstance(vkInstance, nullptr);
+}
+
 bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 {
   // Retrieve the physical device from OpenXR
@@ -724,25 +743,6 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 void Context::sync() const
 {
   vkDeviceWaitIdle(device);
-}
-
-void Context::destroy() const
-{
-  // Clean up OpenXR
-#ifdef DEBUG
-  xrDestroyDebugUtilsMessengerEXT(xrDebugUtilsMessenger);
-#endif
-
-  xrDestroyInstance(xrInstance);
-
-  // Clean up Vulkan
-  vkDestroyDevice(device, nullptr);
-
-#ifdef DEBUG
-  vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugUtilsMessenger, nullptr);
-#endif
-
-  vkDestroyInstance(vkInstance, nullptr);
 }
 
 bool Context::isValid() const

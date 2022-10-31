@@ -69,9 +69,5 @@ int main()
   }
 
   context.sync(); // Sync before destroying so that resources are free
-  renderer.destroy();
-  headset.destroy();
-  mirrorView.destroy();
-  context.destroy();
   return EXIT_SUCCESS;
 }

@@ -13,8 +13,7 @@ class MirrorView final
 {
 public:
   MirrorView(const Context* context);
-
-  void destroy() const; // Only call when construction succeeded
+  ~MirrorView();
 
   void onWindowResize();
 
