@@ -2,8 +2,6 @@
 
 #include "Util.h"
 
-#include <vector>
-
 RenderTarget::RenderTarget(VkDevice device,
                            VkImage image,
                            VkImageView depthImageView,
