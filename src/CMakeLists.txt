@@ -28,6 +28,9 @@ set(SRC
   Renderer.cpp
   Renderer.h
 
+  RenderCommand.cpp
+  RenderCommand.h
+
   RenderTarget.cpp
   RenderTarget.h
 

@@ -2,10 +2,13 @@
 
 #include <vulkan/vulkan.h>
 
+#include <vector>
+
 class Buffer;
 class Context;
 class Headset;
 class Pipeline;
+class RenderCommand;
 
 class Renderer final
 {
@@ -13,13 +16,13 @@ public:
   Renderer(const Context* context, const Headset* headset);
   ~Renderer();
 
-  void render(size_t swapchainImageIndex) const;
-  void submit() const;
+  void render(size_t swapchainImageIndex);
+  void submit(bool useSemaphores) const;
 
   bool isValid() const;
-  VkCommandBuffer getCommandBuffer() const;
-  VkSemaphore getImageAvailableSemaphore() const;
-  VkSemaphore getRenderFinishedSemaphore() const;
+  VkCommandBuffer getCurrentCommandBuffer() const;
+  VkSemaphore getCurrentDrawableSemaphore() const;
+  VkSemaphore getCurrentPresentableSemaphore() const;
 
 private:
   bool valid = true;
@@ -28,9 +31,8 @@ private:
   const Headset* headset = nullptr;
 
   VkCommandPool commandPool = nullptr;
-  VkCommandBuffer commandBuffer = nullptr;
-  VkSemaphore imageAvailableSemaphore = nullptr, renderFinishedSemaphore = nullptr;
-  VkFence inFlightFence = nullptr;
+  size_t currentRenderCommand = 0u;
+  std::vector<RenderCommand*> renderCommands;
   VkDescriptorSetLayout descriptorSetLayout = nullptr;
   VkDescriptorPool descriptorPool = nullptr;
   VkDescriptorSet descriptorSet = nullptr;

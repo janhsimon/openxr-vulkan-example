@@ -407,8 +407,8 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     switch (buffer.type)
     {
     case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
-      exitSession();
-      break;
+      shouldClose = true;
+      return BeginFrameResult::SkipFully;
     case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:
     {
       XrEventDataSessionStateChanged* event = reinterpret_cast<XrEventDataSessionStateChanged*>(&buffer);
@@ -430,10 +430,8 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
       }
       else if (event->state == XR_SESSION_STATE_LOSS_PENDING || event->state == XR_SESSION_STATE_EXITING)
       {
-        if (!exitSession())
-        {
-          return BeginFrameResult::Error;
-        }
+        shouldClose = true;
+        return BeginFrameResult::SkipFully;
       }
 
       break;
@@ -575,6 +573,11 @@ bool Headset::isValid() const
   return valid;
 }
 
+bool Headset::headsetShouldClose() const
+{
+  return shouldClose;
+}
+
 VkRenderPass Headset::getRenderPass() const
 {
   return renderPass;
@@ -625,27 +628,6 @@ bool Headset::endSession() const
 {
   // End the session
   const XrResult result = xrEndSession(session);
-  if (XR_FAILED(result))
-  {
-    util::error(Error::GenericOpenXR);
-    return false;
-  }
-
-  return true;
-}
-
-bool Headset::exitSession() const
-{
-  // Destroy the session
-  XrResult result = xrDestroySession(session);
-  if (XR_FAILED(result))
-  {
-    util::error(Error::GenericOpenXR);
-    return false;
-  }
-
-  // Destroy the instance
-  result = xrDestroyInstance(context->getXrInstance());
   if (XR_FAILED(result))
   {
     util::error(Error::GenericOpenXR);

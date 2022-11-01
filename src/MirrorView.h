@@ -19,7 +19,14 @@ public:
 
   bool connect(const Headset* headset, const Renderer* renderer);
   void processWindowEvents() const;
-  bool render(uint32_t swapchainImageIndex);
+
+  enum class RenderResult
+  {
+    Error,    // An error occurred
+    Visible,  // Visible mirror view for normal rendering
+    Invisible // Minimized window for example without rendering
+  };
+  RenderResult render(uint32_t swapchainImageIndex);
   void present();
 
   bool isValid() const;

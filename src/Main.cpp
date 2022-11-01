@@ -45,24 +45,31 @@ int main()
     mirrorView.processWindowEvents();
 
     uint32_t swapchainImageIndex;
-    Headset::BeginFrameResult result = headset.beginFrame(swapchainImageIndex);
-    if (result == Headset::BeginFrameResult::Error)
+    const Headset::BeginFrameResult frameResult = headset.beginFrame(swapchainImageIndex);
+    if (frameResult == Headset::BeginFrameResult::Error)
     {
       return EXIT_FAILURE;
     }
-    else if (result == Headset::BeginFrameResult::RenderFully)
+    else if (frameResult == Headset::BeginFrameResult::RenderFully)
     {
       renderer.render(swapchainImageIndex);
-      const bool presentMirrorView = mirrorView.render(swapchainImageIndex);
-      renderer.submit();
 
-      if (presentMirrorView)
+      const MirrorView::RenderResult mirrorResult = mirrorView.render(swapchainImageIndex);
+      if (mirrorResult == MirrorView::RenderResult::Error)
+      {
+        return EXIT_FAILURE;
+      }
+
+      const bool mirrorViewVisible = (mirrorResult == MirrorView::RenderResult::Visible);
+      renderer.submit(mirrorViewVisible);
+
+      if (mirrorViewVisible)
       {
         mirrorView.present();
       }
     }
 
-    if (result == Headset::BeginFrameResult::RenderFully || result == Headset::BeginFrameResult::SkipRender)
+    if (frameResult == Headset::BeginFrameResult::RenderFully || frameResult == Headset::BeginFrameResult::SkipRender)
     {
       headset.endFrame();
     }

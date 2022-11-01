@@ -69,8 +69,8 @@ Context::Context()
     applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
     applicationInfo.applicationVersion = static_cast<uint32_t>(XR_MAKE_VERSION(0, 1, 0));
     applicationInfo.engineVersion = static_cast<uint32_t>(XR_MAKE_VERSION(0, 1, 0));
-    strncpy_s(applicationInfo.applicationName, "openxr-vulkan-example", XR_MAX_APPLICATION_NAME_SIZE);
-    strncpy_s(applicationInfo.engineName, "openxr-vulkan-example", XR_MAX_ENGINE_NAME_SIZE);
+    strncpy_s(applicationInfo.applicationName, "OpenXR Vulkan Example", XR_MAX_APPLICATION_NAME_SIZE);
+    strncpy_s(applicationInfo.engineName, "OpenXR Vulkan Example", XR_MAX_ENGINE_NAME_SIZE);
 
     std::vector<const char*> extensions = { XR_KHR_VULKAN_ENABLE_EXTENSION_NAME };
 
@@ -354,8 +354,8 @@ Context::Context()
     applicationInfo.apiVersion = VK_API_VERSION_1_3;
     applicationInfo.applicationVersion = VK_MAKE_API_VERSION(0, 0, 1, 0);
     applicationInfo.engineVersion = VK_MAKE_API_VERSION(0, 0, 1, 0);
-    applicationInfo.pApplicationName = "openxr-vulkan-example";
-    applicationInfo.pEngineName = "openxr-vulkan-example";
+    applicationInfo.pApplicationName = "OpenXR Vulkan Example";
+    applicationInfo.pEngineName = "OpenXR Vulkan Example";
 
     VkInstanceCreateInfo instanceCreateInfo{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
@@ -489,7 +489,10 @@ Context::~Context()
   vkDestroyDevice(device, nullptr);
 
 #ifdef DEBUG
-  vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugUtilsMessenger, nullptr);
+  if (vkInstance)
+  {
+    vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugUtilsMessenger, nullptr);
+  }
 #endif
 
   vkDestroyInstance(vkInstance, nullptr);

@@ -102,9 +102,14 @@ bool MirrorView::connect(const Headset* headset, const Renderer* renderer)
 void MirrorView::processWindowEvents() const
 {
   glfwPollEvents();
+
+  if (headset->headsetShouldClose())
+  {
+    glfwSetWindowShouldClose(window, 1);
+  }
 }
 
-bool MirrorView::render(uint32_t swapchainImageIndex)
+MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
 {
   if (renderSize.width == 0u || renderSize.height == 0u)
   {
@@ -114,32 +119,36 @@ bool MirrorView::render(uint32_t swapchainImageIndex)
       resizeDetected = false;
       if (!recreateSwapchain())
       {
-        return false;
+        return RenderResult::Error;
       }
     }
     else
     {
       // Otherwise skip minimized frames
-      return false;
+      return RenderResult::Invisible;
     }
   }
 
   const VkResult result =
-    vkAcquireNextImageKHR(context->getVkDevice(), swapchain, UINT64_MAX, renderer->getImageAvailableSemaphore(),
+    vkAcquireNextImageKHR(context->getVkDevice(), swapchain, UINT64_MAX, renderer->getCurrentDrawableSemaphore(),
                           VK_NULL_HANDLE, &destinationImageIndex);
   if (result == VK_ERROR_OUT_OF_DATE_KHR)
   {
     // Recreate the swapchain and then stop rendering this frame as it is out of date already
-    recreateSwapchain();
-    return false;
+    if (!recreateSwapchain())
+    {
+      return RenderResult::Error;
+    }
+
+    return RenderResult::Invisible;
   }
   else if (result != VK_SUBOPTIMAL_KHR && result != VK_SUCCESS)
   {
-    // Just continue in case of a suboptimal
-    return false;
+    // Treat a suboptimal like a successful frame
+    return RenderResult::Invisible;
   }
 
-  const VkCommandBuffer commandBuffer = renderer->getCommandBuffer();
+  const VkCommandBuffer commandBuffer = renderer->getCurrentCommandBuffer();
   const VkImage sourceImage = headset->getRenderTarget(swapchainImageIndex)->getImage();
   const VkImage destinationImage = swapchainImages.at(destinationImageIndex);
   const VkExtent2D resolution = headset->getEyeResolution(mirrorEyeIndex);
@@ -216,16 +225,16 @@ bool MirrorView::render(uint32_t swapchainImageIndex)
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
                        0u, nullptr, 1u, &imageMemoryBarrier);
 
-  return true;
+  return RenderResult::Visible;
 }
 
 void MirrorView::present()
 {
-  const VkSemaphore renderFinishedSemaphore = renderer->getRenderFinishedSemaphore();
+  const VkSemaphore presentableSemaphore = renderer->getCurrentPresentableSemaphore();
 
   VkPresentInfoKHR presentInfo{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
   presentInfo.waitSemaphoreCount = 1u;
-  presentInfo.pWaitSemaphores = &renderFinishedSemaphore;
+  presentInfo.pWaitSemaphores = &presentableSemaphore;
   presentInfo.swapchainCount = 1u;
   presentInfo.pSwapchains = &swapchain;
   presentInfo.pImageIndices = &destinationImageIndex;

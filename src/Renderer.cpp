@@ -4,6 +4,7 @@
 #include "Context.h"
 #include "Headset.h"
 #include "Pipeline.h"
+#include "RenderCommand.h"
 #include "RenderTarget.h"
 #include "Util.h"
 
@@ -13,6 +14,8 @@
 
 namespace
 {
+constexpr size_t numFramesInFlight = 2u;
+
 struct Vertex final
 {
   glm::vec3 position;
@@ -72,42 +75,15 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     return;
   }
 
-  // Allocate a command buffer
-  VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-  commandBufferAllocateInfo.commandPool = commandPool;
-  commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  commandBufferAllocateInfo.commandBufferCount = 1u;
-  if (vkAllocateCommandBuffers(vkDevice, &commandBufferAllocateInfo, &commandBuffer) != VK_SUCCESS)
+  renderCommands.resize(numFramesInFlight);
+  for (RenderCommand*& renderCommand : renderCommands)
   {
-    util::error(Error::GenericVulkan);
-    valid = false;
-    return;
-  }
-
-  // Create the semaphores
-  VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-  if (vkCreateSemaphore(vkDevice, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS)
-  {
-    util::error(Error::GenericVulkan);
-    valid = false;
-    return;
-  }
-
-  if (vkCreateSemaphore(vkDevice, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS)
-  {
-    util::error(Error::GenericVulkan);
-    valid = false;
-    return;
-  }
-
-  // Create a memory fence
-  VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-  fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-  if (vkCreateFence(vkDevice, &fenceCreateInfo, nullptr, &inFlightFence) != VK_SUCCESS)
-  {
-    util::error(Error::GenericVulkan);
-    valid = false;
-    return;
+    renderCommand = new RenderCommand(vkDevice, commandPool);
+    if (!renderCommand->isValid())
+    {
+      valid = false;
+      return;
+    }
   }
 
   // Create an empty uniform buffer
@@ -252,7 +228,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     }
 
     // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*vertexBuffer, commandBuffer, context->getVkDrawQueue()))
+    if (!stagingBuffer->copyTo(*vertexBuffer, renderCommands.at(0u)->getCommandBuffer(), context->getVkDrawQueue()))
     {
       valid = false;
       return;
@@ -286,7 +262,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     }
 
     // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*indexBuffer, commandBuffer, context->getVkDrawQueue()))
+    if (!stagingBuffer->copyTo(*indexBuffer, renderCommands.at(0u)->getCommandBuffer(), context->getVkDrawQueue()))
     {
       valid = false;
       return;
@@ -312,18 +288,27 @@ Renderer::~Renderer()
 
   delete uniformBuffer;
 
-  vkDestroyFence(vkDevice, inFlightFence, nullptr);
-  vkDestroySemaphore(vkDevice, renderFinishedSemaphore, nullptr);
-  vkDestroySemaphore(vkDevice, imageAvailableSemaphore, nullptr);
+  for (const RenderCommand* renderCommand : renderCommands)
+  {
+    delete renderCommand;
+  }
+
   vkDestroyCommandPool(vkDevice, commandPool, nullptr);
 }
 
-void Renderer::render(size_t swapchainImageIndex) const
+void Renderer::render(size_t swapchainImageIndex)
 {
-  if (vkResetFences(context->getVkDevice(), 1u, &inFlightFence) != VK_SUCCESS)
+  currentRenderCommand = (currentRenderCommand + 1u) % renderCommands.size();
+
+  const RenderCommand* renderCommand = renderCommands.at(currentRenderCommand);
+
+  const VkFence busyFence = renderCommand->getBusyFence();
+  if (vkResetFences(context->getVkDevice(), 1u, &busyFence) != VK_SUCCESS)
   {
     return;
   }
+
+  const VkCommandBuffer commandBuffer = renderCommand->getCommandBuffer();
 
   if (vkResetCommandBuffer(commandBuffer, 0u) != VK_SUCCESS)
   {
@@ -403,24 +388,34 @@ void Renderer::render(size_t swapchainImageIndex) const
   vkCmdEndRenderPass(commandBuffer);
 }
 
-void Renderer::submit() const
+void Renderer::submit(bool useSemaphores) const
 {
+  const RenderCommand* renderCommand = renderCommands.at(currentRenderCommand);
+  const VkCommandBuffer commandBuffer = renderCommand->getCommandBuffer();
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
   {
     return;
   }
 
   const VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+  const VkSemaphore drawableSemaphore = renderCommand->getDrawableSemaphore();
+  const VkSemaphore presentableSemaphore = renderCommand->getPresentableSemaphore();
+  const VkFence busyFence = renderCommand->getBusyFence();
 
   VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
-  submitInfo.waitSemaphoreCount = 1u;
-  submitInfo.pWaitSemaphores = &imageAvailableSemaphore;
   submitInfo.pWaitDstStageMask = &waitStages;
   submitInfo.commandBufferCount = 1u;
   submitInfo.pCommandBuffers = &commandBuffer;
-  submitInfo.signalSemaphoreCount = 1u;
-  submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
-  if (vkQueueSubmit(context->getVkDrawQueue(), 1u, &submitInfo, inFlightFence) != VK_SUCCESS)
+
+  if (useSemaphores)
+  {
+    submitInfo.waitSemaphoreCount = 1u;
+    submitInfo.pWaitSemaphores = &drawableSemaphore;
+    submitInfo.signalSemaphoreCount = 1u;
+    submitInfo.pSignalSemaphores = &presentableSemaphore;
+  }
+
+  if (vkQueueSubmit(context->getVkDrawQueue(), 1u, &submitInfo, busyFence) != VK_SUCCESS)
   {
     return;
   }
@@ -431,17 +426,17 @@ bool Renderer::isValid() const
   return valid;
 }
 
-VkCommandBuffer Renderer::getCommandBuffer() const
+VkCommandBuffer Renderer::getCurrentCommandBuffer() const
 {
-  return commandBuffer;
+  return renderCommands.at(currentRenderCommand)->getCommandBuffer();
 }
 
-VkSemaphore Renderer::getImageAvailableSemaphore() const
+VkSemaphore Renderer::getCurrentDrawableSemaphore() const
 {
-  return imageAvailableSemaphore;
+  return renderCommands.at(currentRenderCommand)->getDrawableSemaphore();
 }
 
-VkSemaphore Renderer::getRenderFinishedSemaphore() const
+VkSemaphore Renderer::getCurrentPresentableSemaphore() const
 {
-  return renderFinishedSemaphore;
+  return renderCommands.at(currentRenderCommand)->getPresentableSemaphore();
 }
