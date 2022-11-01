@@ -9,9 +9,9 @@
 
 namespace
 {
-inline constexpr XrReferenceSpaceType spaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
-inline constexpr VkFormat colorFormat = VK_FORMAT_R8G8B8A8_SRGB;
-inline constexpr VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
+constexpr XrReferenceSpaceType spaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+constexpr VkFormat colorFormat = VK_FORMAT_R8G8B8A8_SRGB;
+constexpr VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 } // namespace
 
 Headset::Headset(const Context* context) : context(context)

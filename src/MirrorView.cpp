@@ -12,10 +12,10 @@
 
 namespace
 {
-inline constexpr const char* windowTitle = "OpenXR Vulkan Example";
-inline constexpr VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB;
-inline constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-inline constexpr size_t mirrorEyeIndex = 1u; // Eye index to mirror, 0 = left, 1 = right
+constexpr const char* windowTitle = "OpenXR Vulkan Example";
+constexpr VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB;
+constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+constexpr size_t mirrorEyeIndex = 1u; // Eye index to mirror, 0 = left, 1 = right
 
 void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
