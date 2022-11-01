@@ -40,7 +40,7 @@ int main()
   }
 
   // Main loop
-  while (!mirrorView.windowShouldClose())
+  while (!headset.isExitRequested() && !mirrorView.isExitRequested())
   {
     mirrorView.processWindowEvents();
 

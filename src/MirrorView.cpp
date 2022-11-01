@@ -102,11 +102,6 @@ bool MirrorView::connect(const Headset* headset, const Renderer* renderer)
 void MirrorView::processWindowEvents() const
 {
   glfwPollEvents();
-
-  if (headset->headsetShouldClose())
-  {
-    glfwSetWindowShouldClose(window, 1);
-  }
 }
 
 MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
@@ -259,7 +254,7 @@ bool MirrorView::isValid() const
   return valid;
 }
 
-bool MirrorView::windowShouldClose() const
+bool MirrorView::isExitRequested() const
 {
   return static_cast<bool>(glfwWindowShouldClose(window));
 }

@@ -30,7 +30,7 @@ public:
   void present();
 
   bool isValid() const;
-  bool windowShouldClose() const;
+  bool isExitRequested() const;
   VkSurfaceKHR getSurface() const;
 
 private:

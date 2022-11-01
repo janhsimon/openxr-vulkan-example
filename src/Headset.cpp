@@ -407,7 +407,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     switch (buffer.type)
     {
     case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
-      shouldClose = true;
+      exitRequested = true;
       return BeginFrameResult::SkipFully;
     case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:
     {
@@ -430,7 +430,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
       }
       else if (event->state == XR_SESSION_STATE_LOSS_PENDING || event->state == XR_SESSION_STATE_EXITING)
       {
-        shouldClose = true;
+        exitRequested = true;
         return BeginFrameResult::SkipFully;
       }
 
@@ -573,9 +573,9 @@ bool Headset::isValid() const
   return valid;
 }
 
-bool Headset::headsetShouldClose() const
+bool Headset::isExitRequested() const
 {
-  return shouldClose;
+  return exitRequested;
 }
 
 VkRenderPass Headset::getRenderPass() const

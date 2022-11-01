@@ -30,7 +30,7 @@ public:
   void endFrame() const;
 
   bool isValid() const;
-  bool headsetShouldClose() const;
+  bool isExitRequested() const;
   VkRenderPass getRenderPass() const;
   size_t getEyeCount() const;
   VkExtent2D getEyeResolution(size_t eyeIndex) const;
@@ -40,8 +40,7 @@ public:
 
 private:
   bool valid = true;
-
-  bool shouldClose = false;
+  bool exitRequested = false;
 
   const Context* context = nullptr;
 
