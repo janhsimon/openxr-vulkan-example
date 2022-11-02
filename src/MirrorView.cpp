@@ -106,7 +106,7 @@ void MirrorView::processWindowEvents() const
 
 MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
 {
-  if (renderSize.width == 0u || renderSize.height == 0u)
+  if (swapchainResolution.width == 0u || swapchainResolution.height == 0u)
   {
     // Just check for maximizing as long as the window is minimized
     if (resizeDetected)
@@ -146,7 +146,7 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
   const VkCommandBuffer commandBuffer = renderer->getCurrentCommandBuffer();
   const VkImage sourceImage = headset->getRenderTarget(swapchainImageIndex)->getImage();
   const VkImage destinationImage = swapchainImages.at(destinationImageIndex);
-  const VkExtent2D resolution = headset->getEyeResolution(mirrorEyeIndex);
+  const VkExtent2D eyeResolution = headset->getEyeResolution(mirrorEyeIndex);
 
   // Convert the source image layout from undefined to transfer source
   VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
@@ -177,18 +177,44 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
                        0u, nullptr, 1u, &imageMemoryBarrier);
 
+  // We need to crop the source image region to preserve the aspect ratio of the mirror view window
+  const glm::vec2 sourceResolution = { static_cast<float>(eyeResolution.width),
+                                       static_cast<float>(eyeResolution.height) };
+  const float sourceAspectRatio = sourceResolution.x / sourceResolution.y;
+  const glm::vec2 destinationResolution = { static_cast<float>(swapchainResolution.width),
+                                            static_cast<float>(swapchainResolution.height) };
+  const float destinationAspectRatio = destinationResolution.x / destinationResolution.y;
+  glm::vec2 cropResolution = sourceResolution, cropOffset = { 0.0f, 0.0f };
+
+  if (sourceAspectRatio < destinationAspectRatio)
+  {
+    cropResolution.y = sourceResolution.x / destinationAspectRatio;
+    cropOffset.y = (sourceResolution.y - cropResolution.y) / 2.0f;
+  }
+  else if (sourceAspectRatio > destinationAspectRatio)
+  {
+    cropResolution.x = sourceResolution.y * destinationAspectRatio;
+    cropOffset.x = (sourceResolution.x - cropResolution.x) / 2.0f;
+  }
+
   // Blit the source to the destination image
   VkImageBlit imageBlit{};
-  imageBlit.srcOffsets[1] = { static_cast<int32_t>(resolution.width), static_cast<int32_t>(resolution.height), 1 };
+  imageBlit.srcOffsets[0] = { static_cast<int32_t>(cropOffset.x), static_cast<int32_t>(cropOffset.y), 0 };
+  imageBlit.srcOffsets[1] = { static_cast<int32_t>(cropOffset.x + cropResolution.x),
+                              static_cast<int32_t>(cropOffset.y + cropResolution.y), 1 };
   imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageBlit.srcSubresource.mipLevel = 0u;
   imageBlit.srcSubresource.baseArrayLayer = mirrorEyeIndex;
   imageBlit.srcSubresource.layerCount = 1u;
-  imageBlit.dstOffsets[1] = { static_cast<int32_t>(renderSize.width), static_cast<int32_t>(renderSize.height), 1 };
+
+  imageBlit.dstOffsets[0] = { 0, 0, 0 };
+  imageBlit.dstOffsets[1] = { static_cast<int32_t>(destinationResolution.x),
+                              static_cast<int32_t>(destinationResolution.y), 1 };
   imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageBlit.dstSubresource.layerCount = 1u;
   imageBlit.dstSubresource.baseArrayLayer = 0u;
   imageBlit.dstSubresource.mipLevel = 0u;
+
   vkCmdBlitImage(commandBuffer, sourceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destinationImage,
                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &imageBlit, VK_FILTER_NEAREST);
 
@@ -289,7 +315,7 @@ bool MirrorView::recreateSwapchain()
         surfaceCapabilities.currentExtent.height != std::numeric_limits<uint32_t>::max())
     {
       // Use any valid extent
-      renderSize = surfaceCapabilities.currentExtent;
+      swapchainResolution = surfaceCapabilities.currentExtent;
     }
     else
     {
@@ -297,14 +323,14 @@ bool MirrorView::recreateSwapchain()
       int width, height;
       glfwGetFramebufferSize(window, &width, &height);
 
-      renderSize.width = glm::clamp(width, static_cast<int>(surfaceCapabilities.minImageExtent.width),
-                                    static_cast<int>(surfaceCapabilities.maxImageExtent.width));
-      renderSize.height = glm::clamp(height, static_cast<int>(surfaceCapabilities.minImageExtent.height),
-                                     static_cast<int>(surfaceCapabilities.maxImageExtent.height));
+      swapchainResolution.width = glm::clamp(width, static_cast<int>(surfaceCapabilities.minImageExtent.width),
+                                             static_cast<int>(surfaceCapabilities.maxImageExtent.width));
+      swapchainResolution.height = glm::clamp(height, static_cast<int>(surfaceCapabilities.minImageExtent.height),
+                                              static_cast<int>(surfaceCapabilities.maxImageExtent.height));
     }
 
     // Skip the rest if the window was minimized
-    if (renderSize.width == 0u || renderSize.height == 0u)
+    if (swapchainResolution.width == 0u || swapchainResolution.height == 0u)
     {
       return true;
     }

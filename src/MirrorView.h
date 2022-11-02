@@ -45,7 +45,7 @@ private:
   VkSurfaceKHR surface = nullptr;
   VkSwapchainKHR swapchain = nullptr;
   std::vector<VkImage> swapchainImages;
-  VkExtent2D renderSize = { 0u, 0u };
+  VkExtent2D swapchainResolution = { 0u, 0u };
 
   uint32_t destinationImageIndex = 0u;
   bool resizeDetected = false;
