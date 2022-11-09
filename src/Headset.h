@@ -1,12 +1,12 @@
 #pragma once
 
+#include <glm/mat4x4.hpp>
+
 #include <vulkan/vulkan.h>
 
 #define XR_USE_GRAPHICS_API_VULKAN
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
-
-#include <glm/mat4x4.hpp>
 
 #include <vector>
 

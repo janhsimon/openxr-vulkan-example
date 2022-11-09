@@ -14,6 +14,7 @@ Pipeline::Pipeline(VkDevice device,
                    const std::vector<VkVertexInputAttributeDescription>& vertexInputAttributeDescriptions)
 : device(device)
 {
+  // Load the vertex shader
   VkShaderModule vertexShaderModule;
   if (!util::loadShaderFromFile(device, vertexFilename, vertexShaderModule))
   {
@@ -24,6 +25,7 @@ Pipeline::Pipeline(VkDevice device,
     return;
   }
 
+  // Load the fragment shader
   VkShaderModule fragmentShaderModule;
   if (!util::loadShaderFromFile(device, fragmentFilename, fragmentShaderModule))
   {

@@ -8,7 +8,7 @@ class Buffer;
 class Context;
 class Headset;
 class Pipeline;
-class RenderCommand;
+class RenderProcess;
 
 class Renderer final
 {
@@ -31,13 +31,11 @@ private:
   const Headset* headset = nullptr;
 
   VkCommandPool commandPool = nullptr;
-  size_t currentRenderCommand = 0u;
-  std::vector<RenderCommand*> renderCommands;
-  VkDescriptorSetLayout descriptorSetLayout = nullptr;
   VkDescriptorPool descriptorPool = nullptr;
-  VkDescriptorSet descriptorSet = nullptr;
+  VkDescriptorSetLayout descriptorSetLayout = nullptr;
+  std::vector<RenderProcess*> renderProcesses;
   VkPipelineLayout pipelineLayout = nullptr;
-
-  Buffer *uniformBuffer = nullptr, *vertexBuffer = nullptr, *indexBuffer = nullptr;
   Pipeline *gridPipeline = nullptr, *cubePipeline = nullptr;
+  Buffer *vertexBuffer = nullptr, *indexBuffer = nullptr;
+  size_t currentRenderProcessIndex = 0u;
 };

@@ -28,8 +28,8 @@ set(SRC
   Renderer.cpp
   Renderer.h
 
-  RenderCommand.cpp
-  RenderCommand.h
+  RenderProcess.cpp
+  RenderProcess.h
 
   RenderTarget.cpp
   RenderTarget.h
