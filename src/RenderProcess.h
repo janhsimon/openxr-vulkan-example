@@ -19,8 +19,8 @@ public:
   struct UniformBufferData final
   {
     glm::mat4 world;
-    glm::mat4 viewProjection[2];
-    float time;
+    glm::mat4 viewProjection[2]; // View projection matrices, 0 = left eye, 1 = right eye
+    float time;                  // For animation
   } uniformBufferData;
 
   bool isValid() const;

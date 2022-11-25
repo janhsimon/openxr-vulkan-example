@@ -3,6 +3,8 @@
 #include "MirrorView.h"
 #include "Renderer.h"
 
+#include <chrono>
+
 int main()
 {
   Context context;
@@ -40,8 +42,16 @@ int main()
   }
 
   // Main loop
+  std::chrono::high_resolution_clock::time_point previousTime = std::chrono::high_resolution_clock::now();
   while (!headset.isExitRequested() && !mirrorView.isExitRequested())
   {
+    // Calculate the delta time in seconds
+    const std::chrono::high_resolution_clock::time_point nowTime = std::chrono::high_resolution_clock::now();
+    const long long elapsedNanoseconds =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(nowTime - previousTime).count();
+    const float deltaTime = static_cast<float>(elapsedNanoseconds) / 1e9f;
+    previousTime = nowTime;
+
     mirrorView.processWindowEvents();
 
     uint32_t swapchainImageIndex;
@@ -52,7 +62,7 @@ int main()
     }
     else if (frameResult == Headset::BeginFrameResult::RenderFully)
     {
-      renderer.render(swapchainImageIndex);
+      renderer.render(swapchainImageIndex, deltaTime);
 
       const MirrorView::RenderResult mirrorResult = mirrorView.render(swapchainImageIndex);
       if (mirrorResult == MirrorView::RenderResult::Error)

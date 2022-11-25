@@ -16,7 +16,7 @@ public:
   Renderer(const Context* context, const Headset* headset);
   ~Renderer();
 
-  void render(size_t swapchainImageIndex);
+  void render(size_t swapchainImageIndex, float deltaTime);
   void submit(bool useSemaphores) const;
 
   bool isValid() const;

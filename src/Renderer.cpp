@@ -259,7 +259,7 @@ Renderer::~Renderer()
   vkDestroyCommandPool(vkDevice, commandPool, nullptr);
 }
 
-void Renderer::render(size_t swapchainImageIndex)
+void Renderer::render(size_t swapchainImageIndex, float deltaTime)
 {
   currentRenderProcessIndex = (currentRenderProcessIndex + 1u) % renderProcesses.size();
 
@@ -294,7 +294,7 @@ void Renderer::render(size_t swapchainImageIndex)
 
   static float time = 0.0f;
   renderProcess->uniformBufferData.time = time;
-  time += 0.01f;
+  time += deltaTime * 2.0f;
 
   if (!renderProcess->updateUniformBufferData())
   {

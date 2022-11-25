@@ -14,7 +14,7 @@ void main()
 {
   const float animation = abs(sin(time.time + position.x / 10.0 + position.z / 10.0));
   const float crossThickness = 0.005 + animation * 0.01;
-  const float crossLength = 0.05 + animation * 0.1;
+  const float crossLength = 0.025 + animation * 0.05;
 
   const float x = mod(position.x, 1.0);
   const float z = mod(position.z, 1.0);
