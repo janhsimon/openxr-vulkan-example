@@ -20,6 +20,7 @@ public:
   {
     glm::mat4 world;
     glm::mat4 viewProjection[2];
+    float time;
   } uniformBufferData;
 
   bool isValid() const;

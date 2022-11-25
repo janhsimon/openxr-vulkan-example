@@ -3,6 +3,8 @@
 #include "Buffer.h"
 #include "Util.h"
 
+#include <array>
+
 RenderProcess::RenderProcess(VkDevice device,
                              VkPhysicalDevice physicalDevice,
                              VkCommandPool commandPool,
@@ -14,6 +16,7 @@ RenderProcess::RenderProcess(VkDevice device,
   uniformBufferData.world = glm::mat4(1.0f);
   uniformBufferData.viewProjection[0] = glm::mat4(1.0f);
   uniformBufferData.viewProjection[1] = glm::mat4(1.0f);
+  uniformBufferData.time = 0.0f;
 
   // Allocate a command buffer
   VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
@@ -78,23 +81,42 @@ RenderProcess::RenderProcess(VkDevice device,
   }
 
   // Associate the descriptor set with the uniform buffer
-  VkDescriptorBufferInfo descriptorBufferInfo;
-  descriptorBufferInfo.buffer = uniformBuffer->getVkBuffer();
-  descriptorBufferInfo.offset = 0u;
-  descriptorBufferInfo.range = VK_WHOLE_SIZE;
+  std::array<VkDescriptorBufferInfo, 2u> descriptorBufferInfos;
 
-  VkWriteDescriptorSet writeDescriptorSet;
-  writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  writeDescriptorSet.pNext = nullptr;
-  writeDescriptorSet.dstSet = descriptorSet;
-  writeDescriptorSet.dstBinding = 0u;
-  writeDescriptorSet.dstArrayElement = 0u;
-  writeDescriptorSet.descriptorCount = 1u;
-  writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
-  writeDescriptorSet.pImageInfo = nullptr;
-  writeDescriptorSet.pTexelBufferView = nullptr;
-  vkUpdateDescriptorSets(device, 1u, &writeDescriptorSet, 0u, nullptr);
+  descriptorBufferInfos.at(0u).buffer = uniformBuffer->getVkBuffer();
+  descriptorBufferInfos.at(0u).offset = 0u;
+  descriptorBufferInfos.at(0u).range = offsetof(UniformBufferData, time);
+
+  descriptorBufferInfos.at(1u).buffer = uniformBuffer->getVkBuffer();
+  descriptorBufferInfos.at(1u).offset = descriptorBufferInfos.at(0u).range;
+  descriptorBufferInfos.at(1u).range = sizeof(float);
+
+  std::array<VkWriteDescriptorSet, 2u> writeDescriptorSets;
+
+  writeDescriptorSets.at(0u).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSets.at(0u).pNext = nullptr;
+  writeDescriptorSets.at(0u).dstSet = descriptorSet;
+  writeDescriptorSets.at(0u).dstBinding = 0u;
+  writeDescriptorSets.at(0u).dstArrayElement = 0u;
+  writeDescriptorSets.at(0u).descriptorCount = 1u;
+  writeDescriptorSets.at(0u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  writeDescriptorSets.at(0u).pBufferInfo = &descriptorBufferInfos.at(0u);
+  writeDescriptorSets.at(0u).pImageInfo = nullptr;
+  writeDescriptorSets.at(0u).pTexelBufferView = nullptr;
+
+  writeDescriptorSets.at(1u).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSets.at(1u).pNext = nullptr;
+  writeDescriptorSets.at(1u).dstSet = descriptorSet;
+  writeDescriptorSets.at(1u).dstBinding = 1u;
+  writeDescriptorSets.at(1u).dstArrayElement = 0u;
+  writeDescriptorSets.at(1u).descriptorCount = 1u;
+  writeDescriptorSets.at(1u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  writeDescriptorSets.at(1u).pBufferInfo = &descriptorBufferInfos.at(1u);
+  writeDescriptorSets.at(1u).pImageInfo = nullptr;
+  writeDescriptorSets.at(1u).pTexelBufferView = nullptr;
+
+  vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u,
+                         nullptr);
 }
 
 RenderProcess::~RenderProcess()

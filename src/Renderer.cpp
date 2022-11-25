@@ -86,15 +86,21 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
   }
 
   // Create a descriptor set layout
-  VkDescriptorSetLayoutBinding descriptorSetLayoutBinding{};
-  descriptorSetLayoutBinding.binding = 0u;
-  descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  descriptorSetLayoutBinding.descriptorCount = 1u;
-  descriptorSetLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  std::array<VkDescriptorSetLayoutBinding, 2u> descriptorSetLayoutBindings;
+
+  descriptorSetLayoutBindings.at(0u).binding = 0u;
+  descriptorSetLayoutBindings.at(0u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descriptorSetLayoutBindings.at(0u).descriptorCount = 1u;
+  descriptorSetLayoutBindings.at(0u).stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+  descriptorSetLayoutBindings.at(1u).binding = 1u;
+  descriptorSetLayoutBindings.at(1u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descriptorSetLayoutBindings.at(1u).descriptorCount = 1u;
+  descriptorSetLayoutBindings.at(1u).stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
   VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-  descriptorSetLayoutCreateInfo.bindingCount = 1u;
-  descriptorSetLayoutCreateInfo.pBindings = &descriptorSetLayoutBinding;
+  descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
+  descriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings.data();
   if (vkCreateDescriptorSetLayout(vkDevice, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) !=
       VK_SUCCESS)
   {
@@ -285,6 +291,10 @@ void Renderer::render(size_t swapchainImageIndex)
     renderProcess->uniformBufferData.viewProjection[eyeIndex] =
       headset->getEyeProjectionMatrix(eyeIndex) * headset->getEyeViewMatrix(eyeIndex);
   }
+
+  static float time = 0.0f;
+  renderProcess->uniformBufferData.time = time;
+  time += 0.01f;
 
   if (!renderProcess->updateUniformBufferData())
   {

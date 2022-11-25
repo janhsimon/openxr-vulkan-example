@@ -1,3 +1,5 @@
+layout(binding = 1) uniform Time { float time; } time;
+
 layout(location = 0) in vec3 color;
 layout(location = 1) in vec3 position;
 
@@ -10,8 +12,9 @@ bool isOnGrid(float position, float threshold)
 
 void main()
 {
-  const float crossThickness = 0.01;
-  const float crossLength = 0.05;
+  const float animation = abs(sin(time.time + position.x / 10.0 + position.z / 10.0));
+  const float crossThickness = 0.005 + animation * 0.01;
+  const float crossLength = 0.05 + animation * 0.1;
 
   const float x = mod(position.x, 1.0);
   const float z = mod(position.z, 1.0);
