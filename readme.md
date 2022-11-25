@@ -28,4 +28,4 @@ Integrating both OpenXR and Vulkan yourself can be a daunting and painfully time
 3. Clone the repository and generate build files.
 4. Build!
 
-The repository includes binaries for all dependencies except the Vulkan SDK on Windows. These can be found in the `external` folder. You will have to build these dependencies yourself on other platforms. Use the adress and version tag or commit hash in `version.txt` to ensure compatibility. Please don't hesitate to open a pull request if you have build dependencies for previously unsupported platforms.
+The repository includes binaries for all dependencies except the Vulkan SDK on Windows. These can be found in the `external` folder. You will have to build these dependencies yourself on other platforms. Use the adress and version tag or commit hash in `version.txt` to ensure compatibility. Please don't hesitate to open a pull request if you have built dependencies for previously unsupported platforms.
