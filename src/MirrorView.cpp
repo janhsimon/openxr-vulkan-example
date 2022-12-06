@@ -151,17 +151,17 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
   // Convert the source image layout from undefined to transfer source
   VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
   imageMemoryBarrier.image = sourceImage;
-  imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-  imageMemoryBarrier.srcAccessMask = 0u;
+  imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
   imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
   imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageMemoryBarrier.subresourceRange.layerCount = 1u;
   imageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
   imageMemoryBarrier.subresourceRange.levelCount = 1u;
   imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
-                       0u, nullptr, 1u, &imageMemoryBarrier);
+  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
 
   // Convert the destination image layout from undefined to transfer destination
   imageMemoryBarrier.image = destinationImage;
@@ -174,8 +174,8 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
   imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
   imageMemoryBarrier.subresourceRange.levelCount = 1u;
   imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
-                       0u, nullptr, 1u, &imageMemoryBarrier);
+  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
 
   // We need to crop the source image region to preserve the aspect ratio of the mirror view window
   const glm::vec2 sourceResolution = { static_cast<float>(eyeResolution.width),
@@ -229,8 +229,8 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
   imageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
   imageMemoryBarrier.subresourceRange.levelCount = 1u;
   imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0u,
-                       0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
+  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                       VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
 
   // Convert the destination image layout from transfer destination to present
   imageMemoryBarrier.image = destinationImage;
@@ -243,8 +243,8 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
   imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
   imageMemoryBarrier.subresourceRange.levelCount = 1u;
   imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr,
-                       0u, nullptr, 1u, &imageMemoryBarrier);
+  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
 
   return RenderResult::Visible;
 }
