@@ -246,17 +246,33 @@ Renderer::~Renderer()
   delete gridPipeline;
 
   const VkDevice vkDevice = context->getVkDevice();
+  if (vkDevice)
+  {
+    if (pipelineLayout)
+    {
+      vkDestroyPipelineLayout(vkDevice, pipelineLayout, nullptr);
+    }
 
-  vkDestroyPipelineLayout(vkDevice, pipelineLayout, nullptr);
-  vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout, nullptr);
-  vkDestroyDescriptorPool(vkDevice, descriptorPool, nullptr);
+    if (descriptorSetLayout)
+    {
+      vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout, nullptr);
+    }
+
+    if (descriptorPool)
+    {
+      vkDestroyDescriptorPool(vkDevice, descriptorPool, nullptr);
+    }
+  }
 
   for (const RenderProcess* renderProcess : renderProcesses)
   {
     delete renderProcess;
   }
 
-  vkDestroyCommandPool(vkDevice, commandPool, nullptr);
+  if (vkDevice && commandPool)
+  {
+    vkDestroyCommandPool(vkDevice, commandPool, nullptr);
+  }
 }
 
 void Renderer::render(size_t swapchainImageIndex, float deltaTime)

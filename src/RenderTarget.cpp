@@ -54,8 +54,18 @@ RenderTarget::RenderTarget(VkDevice device,
 
 RenderTarget::~RenderTarget()
 {
-  vkDestroyFramebuffer(device, framebuffer, nullptr);
-  vkDestroyImageView(device, imageView, nullptr);
+  if (device)
+  {
+    if (framebuffer)
+    {
+      vkDestroyFramebuffer(device, framebuffer, nullptr);
+    }
+
+    if (imageView)
+    {
+      vkDestroyImageView(device, imageView, nullptr);
+    }
+  }
 }
 
 bool RenderTarget::isValid() const

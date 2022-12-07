@@ -376,23 +376,54 @@ Headset::Headset(const Context* context) : context(context)
 Headset::~Headset()
 {
   // Clean up OpenXR
-  xrEndSession(session);
-  xrDestroySwapchain(swapchain);
+  if (session)
+  {
+    xrEndSession(session);
+  }
+
+  if (swapchain)
+  {
+    xrDestroySwapchain(swapchain);
+  }
 
   for (const RenderTarget* renderTarget : swapchainRenderTargets)
   {
     delete renderTarget;
   }
 
-  xrDestroySpace(space);
-  xrDestroySession(session);
+  if (space)
+  {
+    xrDestroySpace(space);
+  }
+
+  if (session)
+  {
+    xrDestroySession(session);
+  }
 
   // Clean up Vulkan
-  const VkDevice vkDevice = context->getVkDevice();
-  vkDestroyImageView(vkDevice, depthImageView, nullptr);
-  vkFreeMemory(vkDevice, depthMemory, nullptr);
-  vkDestroyImage(vkDevice, depthImage, nullptr);
-  vkDestroyRenderPass(vkDevice, renderPass, nullptr);
+  if (const VkDevice vkDevice = context->getVkDevice())
+  {
+    if (depthImageView)
+    {
+      vkDestroyImageView(vkDevice, depthImageView, nullptr);
+    }
+
+    if (depthMemory)
+    {
+      vkFreeMemory(vkDevice, depthMemory, nullptr);
+    }
+
+    if (depthImage)
+    {
+      vkDestroyImage(vkDevice, depthImage, nullptr);
+    }
+
+    if (renderPass)
+    {
+      vkDestroyRenderPass(vkDevice, renderPass, nullptr);
+    }
+  }
 }
 
 Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)

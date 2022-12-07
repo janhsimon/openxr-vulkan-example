@@ -123,9 +123,23 @@ RenderProcess::~RenderProcess()
 {
   delete uniformBuffer;
 
-  vkDestroyFence(device, busyFence, nullptr);
-  vkDestroySemaphore(device, presentableSemaphore, nullptr);
-  vkDestroySemaphore(device, drawableSemaphore, nullptr);
+  if (device)
+  {
+    if (busyFence)
+    {
+      vkDestroyFence(device, busyFence, nullptr);
+    }
+
+    if (presentableSemaphore)
+    {
+      vkDestroySemaphore(device, presentableSemaphore, nullptr);
+    }
+
+    if (drawableSemaphore)
+    {
+      vkDestroySemaphore(device, drawableSemaphore, nullptr);
+    }
+  }
 }
 
 bool RenderProcess::isValid() const

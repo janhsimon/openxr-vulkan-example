@@ -86,8 +86,18 @@ Buffer::Buffer(const VkDevice device,
 
 Buffer::~Buffer()
 {
-  vkFreeMemory(device, deviceMemory, nullptr);
-  vkDestroyBuffer(device, buffer, nullptr);
+  if (device)
+  {
+    if (deviceMemory)
+    {
+      vkFreeMemory(device, deviceMemory, nullptr);
+    }
+
+    if (buffer)
+    {
+      vkDestroyBuffer(device, buffer, nullptr);
+    }
+  }
 }
 
 bool Buffer::copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue queue) const

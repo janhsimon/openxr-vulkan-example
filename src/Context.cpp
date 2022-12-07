@@ -480,22 +480,34 @@ Context::~Context()
 {
   // Clean up OpenXR
 #ifdef DEBUG
-  xrDestroyDebugUtilsMessengerEXT(xrDebugUtilsMessenger);
-#endif
-
-  xrDestroyInstance(xrInstance);
-
-  // Clean up Vulkan
-  vkDestroyDevice(device, nullptr);
-
-#ifdef DEBUG
-  if (vkInstance)
+  if (xrDebugUtilsMessenger)
   {
-    vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugUtilsMessenger, nullptr);
+    xrDestroyDebugUtilsMessengerEXT(xrDebugUtilsMessenger);
   }
 #endif
 
-  vkDestroyInstance(vkInstance, nullptr);
+  if (xrInstance)
+  {
+    xrDestroyInstance(xrInstance);
+  }
+
+  // Clean up Vulkan
+  if (device)
+  {
+    vkDestroyDevice(device, nullptr);
+  }
+
+  if (vkInstance)
+  {
+#ifdef DEBUG
+    if (vkDebugUtilsMessenger)
+    {
+      vkDestroyDebugUtilsMessengerEXT(vkInstance, vkDebugUtilsMessenger, nullptr);
+    }
+#endif
+
+    vkDestroyInstance(vkInstance, nullptr);
+  }
 }
 
 bool Context::createDevice(VkSurfaceKHR mirrorSurface)

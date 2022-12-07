@@ -144,7 +144,10 @@ Pipeline::Pipeline(VkDevice device,
 
 Pipeline::~Pipeline()
 {
-  vkDestroyPipeline(device, pipeline, nullptr);
+  if (device && pipeline)
+  {
+    vkDestroyPipeline(device, pipeline, nullptr);
+  }
 }
 
 void Pipeline::bind(VkCommandBuffer commandBuffer) const
