@@ -312,10 +312,7 @@ void Renderer::render(size_t swapchainImageIndex, float deltaTime)
   renderProcess->uniformBufferData.time = time;
   time += deltaTime * 2.0f;
 
-  if (!renderProcess->updateUniformBufferData())
-  {
-    return;
-  }
+  renderProcess->updateUniformBufferData();
 
   const std::array clearValues = { VkClearValue({ 0.01f, 0.01f, 0.01f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
 

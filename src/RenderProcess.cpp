@@ -67,6 +67,14 @@ RenderProcess::RenderProcess(VkDevice device,
     return;
   }
 
+  // Map the uniform buffer memory
+  uniformBufferMemory = uniformBuffer->map();
+  if (!uniformBufferMemory)
+  {
+    valid = false;
+    return;
+  }
+
   // Allocate a descriptor set
   VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
   descriptorSetAllocateInfo.descriptorPool = descriptorPool;
@@ -121,6 +129,10 @@ RenderProcess::RenderProcess(VkDevice device,
 
 RenderProcess::~RenderProcess()
 {
+  if (uniformBuffer)
+  {
+    uniformBuffer->unmap();
+  }
   delete uniformBuffer;
 
   if (device)
@@ -172,16 +184,12 @@ VkDescriptorSet RenderProcess::getDescriptorSet() const
   return descriptorSet;
 }
 
-bool RenderProcess::updateUniformBufferData() const
+void RenderProcess::updateUniformBufferData() const
 {
-  void* data = uniformBuffer->map();
-  if (!data)
+  if (!uniformBufferMemory)
   {
-    return false;
+    return;
   }
 
-  memcpy(data, &uniformBufferData, sizeof(UniformBufferData));
-  uniformBuffer->unmap();
-
-  return true;
+  memcpy(uniformBufferMemory, &uniformBufferData, sizeof(UniformBufferData));
 }

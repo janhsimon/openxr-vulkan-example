@@ -31,7 +31,7 @@ public:
   VkFence getBusyFence() const;
   VkDescriptorSet getDescriptorSet() const;
 
-  bool updateUniformBufferData() const;
+  void updateUniformBufferData() const;
 
 private:
   bool valid = true;
@@ -41,5 +41,6 @@ private:
   VkSemaphore drawableSemaphore = nullptr, presentableSemaphore = nullptr;
   VkFence busyFence = nullptr;
   Buffer* uniformBuffer = nullptr;
+  void* uniformBufferMemory = nullptr;
   VkDescriptorSet descriptorSet = nullptr;
 };
