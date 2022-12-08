@@ -169,65 +169,44 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     return;
   }
 
-  // Create a vertex buffer
+  // Create a geometry buffer
   {
-    // Create a staging buffer and fill it with the vertex data
-    constexpr size_t size = sizeof(vertices);
-    Buffer* stagingBuffer = new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                       static_cast<VkDeviceSize>(size), static_cast<const void*>(vertices.data()));
+    // Create a staging buffer
+    constexpr VkDeviceSize bufferSize = static_cast<VkDeviceSize>(sizeof(vertices) + sizeof(indices));
+    Buffer* stagingBuffer =
+      new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize);
     if (!stagingBuffer->isValid())
     {
       valid = false;
       return;
     }
 
+    // Fill the staging buffer with geometry data
+    char* bufferData = static_cast<char*>(stagingBuffer->map());
+    if (!bufferData)
+    {
+      valid = false;
+      return;
+    }
+
+    memcpy(bufferData, vertices.data(), sizeof(vertices));                  // Vertex section first
+    memcpy(bufferData + sizeof(vertices), indices.data(), sizeof(indices)); // Index section next
+    stagingBuffer->unmap();
+
     // Create an empty target buffer
-    vertexBuffer =
-      new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
-    if (!vertexBuffer->isValid())
+    geometryBuffer = new Buffer(vkDevice, vkPhysicalDevice,
+                                VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                                  VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize);
+    if (!geometryBuffer->isValid())
     {
       valid = false;
       return;
     }
 
     // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*vertexBuffer, renderProcesses.at(0u)->getCommandBuffer(), context->getVkDrawQueue()))
-    {
-      valid = false;
-      return;
-    }
-
-    // Clean up the staging buffer
-    delete stagingBuffer;
-  }
-
-  // Create an index buffer
-  {
-    // Create a staging buffer and fill it with the index data
-    constexpr size_t size = sizeof(indices);
-    Buffer* stagingBuffer = new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                       static_cast<VkDeviceSize>(size), static_cast<const void*>(indices.data()));
-    if (!stagingBuffer->isValid())
-    {
-      valid = false;
-      return;
-    }
-
-    // Create an empty target buffer
-    indexBuffer =
-      new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<VkDeviceSize>(size));
-    if (!indexBuffer->isValid())
-    {
-      valid = false;
-      return;
-    }
-
-    // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*indexBuffer, renderProcesses.at(0u)->getCommandBuffer(), context->getVkDrawQueue()))
+    if (!stagingBuffer->copyTo(*geometryBuffer, renderProcesses.at(0u)->getCommandBuffer(), context->getVkDrawQueue()))
     {
       valid = false;
       return;
@@ -240,8 +219,7 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
 
 Renderer::~Renderer()
 {
-  delete indexBuffer;
-  delete vertexBuffer;
+  delete geometryBuffer;
   delete cubePipeline;
   delete gridPipeline;
 
@@ -342,13 +320,14 @@ void Renderer::render(size_t swapchainImageIndex, float deltaTime)
   scissor.extent = renderPassBeginInfo.renderArea.extent;
   vkCmdSetScissor(commandBuffer, 0u, 1u, &scissor);
 
-  // Bind the vertex buffer
-  const VkDeviceSize offset = 0u;
-  const VkBuffer buffer = vertexBuffer->getVkBuffer();
+  // Bind the vertex section of the geometry buffer
+  VkDeviceSize offset = 0u;
+  const VkBuffer buffer = geometryBuffer->getVkBuffer();
   vkCmdBindVertexBuffers(commandBuffer, 0u, 1u, &buffer, &offset);
 
-  // Bind the index buffer
-  vkCmdBindIndexBuffer(commandBuffer, indexBuffer->getVkBuffer(), 0u, VK_INDEX_TYPE_UINT16);
+  // Bind the index section of the geometry buffer
+  offset = sizeof(vertices);
+  vkCmdBindIndexBuffer(commandBuffer, buffer, offset, VK_INDEX_TYPE_UINT16);
 
   // Bind the uniform buffer
   const VkDescriptorSet descriptorSet = renderProcess->getDescriptorSet();

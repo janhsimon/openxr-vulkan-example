@@ -8,8 +8,7 @@ Buffer::Buffer(const VkDevice device,
                const VkPhysicalDevice physicalDevice,
                const VkBufferUsageFlags bufferUsageFlags,
                const VkMemoryPropertyFlags memoryProperties,
-               const VkDeviceSize size,
-               const void* data)
+               const VkDeviceSize size)
 : device(device), size(size)
 {
   VkBufferCreateInfo bufferCreateInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
@@ -67,20 +66,6 @@ Buffer::Buffer(const VkDevice device,
     util::error(Error::GenericVulkan);
     valid = false;
     return;
-  }
-
-  // Fill the buffer with data
-  if (data)
-  {
-    void* bufferData = map();
-    if (!bufferData)
-    {
-      valid = false;
-      return;
-    }
-
-    memcpy(bufferData, data, size);
-    unmap();
   }
 }
 

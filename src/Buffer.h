@@ -9,8 +9,7 @@ public:
          VkPhysicalDevice physicalDevice,
          VkBufferUsageFlags bufferUsageFlags,
          VkMemoryPropertyFlags memoryProperties,
-         VkDeviceSize size,
-         const void* data = nullptr);
+         VkDeviceSize size);
   ~Buffer();
 
   bool copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue queue) const;
