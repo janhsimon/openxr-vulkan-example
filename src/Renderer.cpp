@@ -3,10 +3,12 @@
 #include "Buffer.h"
 #include "Context.h"
 #include "Headset.h"
+#include "ModelLoader.h"
 #include "Pipeline.h"
 #include "RenderProcess.h"
 #include "RenderTarget.h"
 #include "Util.h"
+#include "Vertex.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -15,45 +17,10 @@
 namespace
 {
 constexpr size_t numFramesInFlight = 2u;
-
-struct Vertex final
-{
-  glm::vec3 position;
-  glm::vec3 color;
-};
-
-constexpr std::array vertices = {
-  // Grid
-  Vertex({ -20.0f, 0.0f, -20.0f }, { 1.0f, 0.0f, 0.0f }), Vertex({ -20.0f, 0.0f, +20.0f }, { 0.0f, 1.0f, 0.0f }),
-  Vertex({ +20.0f, 0.0f, -20.0f }, { 0.0f, 0.0f, 1.0f }), Vertex({ +20.0f, 0.0f, +20.0f }, { 1.0f, 0.0f, 1.0f }),
-
-  // Cube front left
-  Vertex({ -1.0f, 0.0f, -3.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ -1.0f, 1.4f, -3.0f }, { 0.8f, 0.8f, 0.8f }),
-  Vertex({ +0.0f, 0.0f, -2.0f }, { 0.8f, 0.8f, 0.8f }), Vertex({ +0.0f, 1.4f, -2.0f }, { 0.8f, 0.8f, 0.8f }),
-
-  // Cube front right
-  Vertex({ +0.0f, 0.0f, -2.0f }, { 0.6f, 0.6f, 0.6f }), Vertex({ +0.0f, 1.4f, -2.0f }, { 0.6f, 0.6f, 0.8f }),
-  Vertex({ +1.0f, 0.0f, -3.0f }, { 0.6f, 0.6f, 0.6f }), Vertex({ +1.0f, 1.4f, -3.0f }, { 0.6f, 0.6f, 0.8f }),
-
-  // Cube back left
-  Vertex({ -1.0f, 0.0f, -3.0f }, { 0.4f, 0.4f, 0.4f }), Vertex({ -1.0f, 1.4f, -3.0f }, { 0.4f, 0.4f, 0.4f }),
-  Vertex({ +0.0f, 0.0f, -4.0f }, { 0.4f, 0.4f, 0.4f }), Vertex({ +0.0f, 1.4f, -4.0f }, { 0.4f, 0.4f, 0.4f }),
-
-  // Cube back right
-  Vertex({ +0.0f, 0.0f, -4.0f }, { 0.2f, 0.2f, 0.2f }), Vertex({ +0.0f, 1.4f, -4.0f }, { 0.2f, 0.2f, 0.2f }),
-  Vertex({ +1.0f, 0.0f, -3.0f }, { 0.2f, 0.2f, 0.2f }), Vertex({ +1.0f, 1.4f, -3.0f }, { 0.2f, 0.2f, 0.2f }),
-
-  // Cube top
-  Vertex({ -1.0f, 1.4f, -3.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ +0.0f, 1.4f, -4.0f }, { 1.0f, 1.0f, 1.0f }),
-  Vertex({ +1.0f, 1.4f, -3.0f }, { 1.0f, 1.0f, 1.0f }), Vertex({ +0.0f, 1.4f, -2.0f }, { 1.0f, 1.0f, 1.0f })
-};
-
-constexpr std::array<uint16_t, 36u> indices = { 0u,  1u,  2u,  1u,  2u,  3u,  4u,  5u,  6u,  5u,  6u,  7u,
-                                                8u,  9u,  10u, 9u,  10u, 11u, 12u, 13u, 14u, 13u, 14u, 15u,
-                                                16u, 17u, 18u, 17u, 18u, 19u, 20u, 21u, 22u, 20u, 22u, 23u };
 } // namespace
 
-Renderer::Renderer(const Context* context, const Headset* headset) : context(context), headset(headset)
+Renderer::Renderer(const Context* context, const Headset* headset, const ModelLoader* modelLoader)
+: context(context), headset(headset)
 {
   const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   const VkDevice vkDevice = context->getVkDevice();
@@ -171,8 +138,11 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
 
   // Create a geometry buffer
   {
+    const size_t verticesSize = geometryBufferIndexOffset = modelLoader->getVerticesSize();
+    const size_t indicesSize = modelLoader->getIndicesSize();
+
     // Create a staging buffer
-    constexpr VkDeviceSize bufferSize = static_cast<VkDeviceSize>(sizeof(vertices) + sizeof(indices));
+    const VkDeviceSize bufferSize = static_cast<VkDeviceSize>(verticesSize + indicesSize);
     Buffer* stagingBuffer =
       new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize);
@@ -190,8 +160,8 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
       return;
     }
 
-    memcpy(bufferData, vertices.data(), sizeof(vertices));                  // Vertex section first
-    memcpy(bufferData + sizeof(vertices), indices.data(), sizeof(indices)); // Index section next
+    memcpy(bufferData, modelLoader->getVerticesData(), verticesSize);              // Vertex section first
+    memcpy(bufferData + verticesSize, modelLoader->getIndicesData(), indicesSize); // Index section next
     stagingBuffer->unmap();
 
     // Create an empty target buffer
@@ -215,6 +185,9 @@ Renderer::Renderer(const Context* context, const Headset* headset) : context(con
     // Clean up the staging buffer
     delete stagingBuffer;
   }
+
+  numIndices = static_cast<uint32_t>(modelLoader->getNumIndices());
+  numGridIndices = static_cast<uint32_t>(modelLoader->getNumIndicesPerModel(0u));
 }
 
 Renderer::~Renderer()
@@ -279,7 +252,7 @@ void Renderer::render(size_t swapchainImageIndex, float deltaTime)
   }
 
   // Update the uniform buffer data
-  renderProcess->uniformBufferData.world = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, 0.0f });
+  renderProcess->uniformBufferData.world = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, -3.0f });
   for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
   {
     renderProcess->uniformBufferData.viewProjection[eyeIndex] =
@@ -326,8 +299,7 @@ void Renderer::render(size_t swapchainImageIndex, float deltaTime)
   vkCmdBindVertexBuffers(commandBuffer, 0u, 1u, &buffer, &offset);
 
   // Bind the index section of the geometry buffer
-  offset = sizeof(vertices);
-  vkCmdBindIndexBuffer(commandBuffer, buffer, offset, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(commandBuffer, buffer, geometryBufferIndexOffset, VK_INDEX_TYPE_UINT16);
 
   // Bind the uniform buffer
   const VkDescriptorSet descriptorSet = renderProcess->getDescriptorSet();
@@ -336,11 +308,11 @@ void Renderer::render(size_t swapchainImageIndex, float deltaTime)
 
   // Draw the grid
   gridPipeline->bind(commandBuffer);
-  vkCmdDrawIndexed(commandBuffer, 6u, 1u, 0u, 0u, 0u);
+  vkCmdDrawIndexed(commandBuffer, numGridIndices, 1u, 0u, 0u, 0u);
 
   // Draw the cube
   cubePipeline->bind(commandBuffer);
-  vkCmdDrawIndexed(commandBuffer, 30u, 1u, 6u, 0u, 0u);
+  vkCmdDrawIndexed(commandBuffer, numIndices - numGridIndices, 1u, numGridIndices, 0u, 0u);
 
   vkCmdEndRenderPass(commandBuffer);
 }

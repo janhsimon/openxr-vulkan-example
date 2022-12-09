@@ -7,13 +7,14 @@
 class Buffer;
 class Context;
 class Headset;
+class ModelLoader;
 class Pipeline;
 class RenderProcess;
 
 class Renderer final
 {
 public:
-  Renderer(const Context* context, const Headset* headset);
+  Renderer(const Context* context, const Headset* headset, const ModelLoader* modelLoader);
   ~Renderer();
 
   void render(size_t swapchainImageIndex, float deltaTime);
@@ -37,5 +38,7 @@ private:
   VkPipelineLayout pipelineLayout = nullptr;
   Pipeline *gridPipeline = nullptr, *cubePipeline = nullptr;
   Buffer* geometryBuffer = nullptr;
+  size_t geometryBufferIndexOffset = 0u;
+  uint32_t numIndices = 0u, numGridIndices = 0u;
   size_t currentRenderProcessIndex = 0u;
 };

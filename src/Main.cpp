@@ -1,12 +1,24 @@
 #include "Context.h"
 #include "Headset.h"
 #include "MirrorView.h"
+#include "ModelLoader.h"
 #include "Renderer.h"
 
 #include <chrono>
 
 int main()
 {
+  ModelLoader* modelLoader = new ModelLoader;
+  if (!modelLoader->loadModel("models/Grid.obj", ModelLoader::Color::Generate))
+  {
+    return EXIT_FAILURE;
+  }
+
+  if (!modelLoader->loadModel("models/Cube.obj", ModelLoader::Color::White))
+  {
+    return EXIT_FAILURE;
+  }
+
   Context context;
   if (!context.isValid())
   {
@@ -30,11 +42,13 @@ int main()
     return EXIT_FAILURE;
   }
 
-  Renderer renderer(&context, &headset);
+  Renderer renderer(&context, &headset, modelLoader);
   if (!renderer.isValid())
   {
     return EXIT_FAILURE;
   }
+
+  delete modelLoader;
 
   if (!mirrorView.connect(&headset, &renderer))
   {

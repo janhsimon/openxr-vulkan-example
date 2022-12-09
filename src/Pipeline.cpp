@@ -20,7 +20,7 @@ Pipeline::Pipeline(VkDevice device,
   {
     std::stringstream s;
     s << "Vertex shader \"" << vertexFilename << "\"";
-    util::error(Error::FileMissing, s.str().c_str());
+    util::error(Error::FileMissing, s.str());
     valid = false;
     return;
   }
@@ -31,7 +31,7 @@ Pipeline::Pipeline(VkDevice device,
   {
     std::stringstream s;
     s << "Fragment shader \"" << fragmentFilename << "\"";
-    util::error(Error::FileMissing, s.str().c_str());
+    util::error(Error::FileMissing, s.str());
     valid = false;
     return;
   }

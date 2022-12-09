@@ -20,6 +20,7 @@ enum class Error
   GenericOpenXR,
   GenericVulkan,
   HeadsetNotConnected,
+  ModelLoadingFailure,
   OutOfMemory,
   VulkanNotSupported,
   WindowFailure

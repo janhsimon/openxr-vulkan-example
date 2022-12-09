@@ -31,6 +31,9 @@ void util::error(Error error, const std::string& details)
   case Error::HeadsetNotConnected:
     s << "No headset detected.\nPlease make sure that your headset is connected and running";
     break;
+  case Error::ModelLoadingFailure:
+    s << "Failed to load model";
+    break;
   case Error::OutOfMemory:
     s << "Program ran out of memory";
     break;
