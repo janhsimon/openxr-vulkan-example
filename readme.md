@@ -1,3 +1,5 @@
+![Cubes](cubes.gif)
+
 # Overview
 
 This project serves to demonstrate how you can write your own VR or XR application using OpenXR and Vulkan. These are the **OpenXR Vulkan Example**'s main features:
