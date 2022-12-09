@@ -2,24 +2,25 @@
 
 # Overview
 
-This project serves to demonstrate how you can write your own VR or XR application using OpenXR and Vulkan. These are the **OpenXR Vulkan Example**'s main features:
+This project demonstrates how you can write your own VR application using OpenXR and Vulkan. These are its main features:
 
-- Basic rendering of example scene to the headset, and into a resizeable mirror view on your desktop monitor.
+- Basic rendering of example scene to the headset and into a resizeable mirror view on your desktop monitor. 
 - Focus on easy to read and understand C++ without smart pointers, inheritance, templates, etc.
+- Usage of the Vulkan `multiview` extension for extra performance.
 - Warning-free code base spread over a small handful of classes.
 - No OpenXR or Vulkan validation errors or warnings.
 - CMake project setup for easy building.
 
-Integrating both OpenXR and Vulkan yourself can be a daunting and painfully time-consuming task. Both APIs are very verbose and require the correct handling of many minute details. This is why there are two main use cases where the **OpenXR Vulkan Example** comes in handy:
+Integrating both OpenXR and Vulkan yourself can be a daunting and painfully time-consuming task. Both APIs are very verbose and require the correct handling of countless minute details. This is why there are two main use cases where this project comes in handy:
 
-- Fork the repository and use it as a starting point, saving yourself weeks of tedious integration work before you get to the juicy bits of VR or XR development.
-- Reference the code while writing your own integration, to help you out if you are stuck with a problem, or for inspiration.
+1. Fork the repository and use it as a starting point to save yourself weeks of tedious integration work before you get to the juicy bits of VR development.
+2. Reference the code while writing your own implementation from scratch, to help you out if you are stuck with a problem, or simply for inspiration.
 
 
 # Running the OpenXR Vulkan Example
 
 1. Download the latest [release](https://github.com/janhsimon/openxr-vulkan-example/releases) (once available) or build the project yourself with the steps below.
-2. Make sure your headset is connected to your computer and running or active.
+2. Make sure your headset is connected to your computer.
 3. Run the program!
 
 
