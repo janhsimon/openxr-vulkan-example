@@ -9,12 +9,12 @@
 int main()
 {
   ModelLoader* modelLoader = new ModelLoader;
-  if (!modelLoader->loadModel("models/Grid.obj", ModelLoader::Color::Generate))
+  if (!modelLoader->loadModel("models/Grid.obj", ModelLoader::Color::FromNormals))
   {
     return EXIT_FAILURE;
   }
 
-  if (!modelLoader->loadModel("models/Cube.obj", ModelLoader::Color::White))
+  if (!modelLoader->loadModel("models/Car.obj", ModelLoader::Color::White))
   {
     return EXIT_FAILURE;
   }

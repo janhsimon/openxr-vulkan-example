@@ -11,7 +11,7 @@ public:
   enum class Color
   {
     White,
-    Generate
+    FromNormals
   };
   bool loadModel(const std::string& filename, Color color);
 

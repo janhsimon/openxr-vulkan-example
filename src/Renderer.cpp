@@ -8,7 +8,6 @@
 #include "RenderProcess.h"
 #include "RenderTarget.h"
 #include "Util.h"
-#include "Vertex.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -105,32 +104,39 @@ Renderer::Renderer(const Context* context, const Headset* headset, const ModelLo
   vertexInputBindingDescription.stride = sizeof(Vertex);
   vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-  VkVertexInputAttributeDescription vertexInputAttributeDescriptionPosition;
-  vertexInputAttributeDescriptionPosition.binding = 0u;
-  vertexInputAttributeDescriptionPosition.location = 0u;
-  vertexInputAttributeDescriptionPosition.format = VK_FORMAT_R32G32B32_SFLOAT;
-  vertexInputAttributeDescriptionPosition.offset = offsetof(Vertex, position);
+  VkVertexInputAttributeDescription vertexInputAttributePosition;
+  vertexInputAttributePosition.binding = 0u;
+  vertexInputAttributePosition.location = 0u;
+  vertexInputAttributePosition.format = VK_FORMAT_R32G32B32_SFLOAT;
+  vertexInputAttributePosition.offset = offsetof(Vertex, position);
 
-  VkVertexInputAttributeDescription vertexInputAttributeDescriptionColor;
-  vertexInputAttributeDescriptionColor.binding = 0u;
-  vertexInputAttributeDescriptionColor.location = 1u;
-  vertexInputAttributeDescriptionColor.format = VK_FORMAT_R32G32B32_SFLOAT;
-  vertexInputAttributeDescriptionColor.offset = offsetof(Vertex, color);
+  VkVertexInputAttributeDescription vertexInputAttributeNormal;
+  vertexInputAttributeNormal.binding = 0u;
+  vertexInputAttributeNormal.location = 1u;
+  vertexInputAttributeNormal.format = VK_FORMAT_R32G32B32_SFLOAT;
+  vertexInputAttributeNormal.offset = offsetof(Vertex, normal);
 
-  gridPipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "shaders/Basic.vert.spv",
-                              "shaders/Grid.frag.spv", { vertexInputBindingDescription },
-                              { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor });
+  VkVertexInputAttributeDescription vertexInputAttributeColor;
+  vertexInputAttributeColor.binding = 0u;
+  vertexInputAttributeColor.location = 2u;
+  vertexInputAttributeColor.format = VK_FORMAT_R32G32B32_SFLOAT;
+  vertexInputAttributeColor.offset = offsetof(Vertex, color);
+
+  gridPipeline =
+    new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "shaders/Grid.vert.spv", "shaders/Grid.frag.spv",
+                 { vertexInputBindingDescription }, { vertexInputAttributePosition, vertexInputAttributeColor });
   if (!gridPipeline->isValid())
   {
     valid = false;
     return;
   }
 
-  // Create the cube pipeline
-  cubePipeline = new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "shaders/Basic.vert.spv",
-                              "shaders/Cube.frag.spv", { vertexInputBindingDescription },
-                              { vertexInputAttributeDescriptionPosition, vertexInputAttributeDescriptionColor });
-  if (!cubePipeline->isValid())
+  // Create the diffuse pipeline
+  diffusePipeline =
+    new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "shaders/Diffuse.vert.spv",
+                 "shaders/Diffuse.frag.spv", { vertexInputBindingDescription },
+                 { vertexInputAttributePosition, vertexInputAttributeNormal, vertexInputAttributeColor });
+  if (!diffusePipeline->isValid())
   {
     valid = false;
     return;
@@ -193,7 +199,7 @@ Renderer::Renderer(const Context* context, const Headset* headset, const ModelLo
 Renderer::~Renderer()
 {
   delete geometryBuffer;
-  delete cubePipeline;
+  delete diffusePipeline;
   delete gridPipeline;
 
   const VkDevice vkDevice = context->getVkDevice();
@@ -252,18 +258,23 @@ void Renderer::render(size_t swapchainImageIndex, float deltaTime)
   }
 
   // Update the uniform buffer data
-  renderProcess->uniformBufferData.world = glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, -3.0f });
-  for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
   {
-    renderProcess->uniformBufferData.viewProjection[eyeIndex] =
-      headset->getEyeProjectionMatrix(eyeIndex) * headset->getEyeViewMatrix(eyeIndex);
+    static float time = 0.0f;
+
+    renderProcess->uniformBufferData.world =
+      glm::rotate(glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, -3.0f }), time * 0.2f, { 0.0f, 1.0f, 0.0f });
+
+    for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
+    {
+      renderProcess->uniformBufferData.viewProjection[eyeIndex] =
+        headset->getEyeProjectionMatrix(eyeIndex) * headset->getEyeViewMatrix(eyeIndex);
+    }
+
+    renderProcess->uniformBufferData.time = time;
+    time += deltaTime;
+
+    renderProcess->updateUniformBufferData();
   }
-
-  static float time = 0.0f;
-  renderProcess->uniformBufferData.time = time;
-  time += deltaTime * 2.0f;
-
-  renderProcess->updateUniformBufferData();
 
   const std::array clearValues = { VkClearValue({ 0.01f, 0.01f, 0.01f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
 
@@ -310,8 +321,8 @@ void Renderer::render(size_t swapchainImageIndex, float deltaTime)
   gridPipeline->bind(commandBuffer);
   vkCmdDrawIndexed(commandBuffer, numGridIndices, 1u, 0u, 0u, 0u);
 
-  // Draw the cube
-  cubePipeline->bind(commandBuffer);
+  // Draw the scene
+  diffusePipeline->bind(commandBuffer);
   vkCmdDrawIndexed(commandBuffer, numIndices - numGridIndices, 1u, numGridIndices, 0u, 0u);
 
   vkCmdEndRenderPass(commandBuffer);

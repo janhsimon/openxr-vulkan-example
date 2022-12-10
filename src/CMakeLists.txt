@@ -1,9 +1,10 @@
 set(TARGET_NAME openxr-vulkan-example)
 
 set(SHADER_SRC
-  shaders/Basic.vert
+  shaders/Diffuse.vert
+  shaders/Diffuse.frag
 
-  shaders/Cube.frag
+  shaders/Grid.vert
   shaders/Grid.frag
 )
 

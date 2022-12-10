@@ -14,39 +14,41 @@ bool ModelLoader::loadModel(const std::string& filename, Color color)
     return false;
   }
 
-  const size_t firstVertex = vertices.size();
-
-  for (size_t i = 0u; i < attrib.vertices.size(); i += 3u)
-  {
-    Vertex vertex;
-    vertex.position = { attrib.vertices.at(i + 0u), attrib.vertices.at(i + 1u), attrib.vertices.at(i + 2u) };
-
-    switch (color)
-    {
-    case Color::White:
-      vertex.color = { 1.0f, 1.0f, 1.0f };
-      break;
-
-    case Color::Generate:
-    {
-      const size_t index = i / 3u;
-      const float r = index % 3u == 0u;
-      const float g = index % 3u == 1u;
-      const float b = index % 4u >= 2u;
-      vertex.color = { r, g, b };
-      break;
-    }
-    }
-
-    vertices.push_back(vertex);
-  }
-
   const size_t oldIndexCount = indices.size();
+
   for (const tinyobj::shape_t& shape : shapes)
   {
-    for (const tinyobj::index_t& index : shape.mesh.indices)
+    for (size_t i = 0u; i < shape.mesh.indices.size(); ++i)
     {
-      indices.push_back(static_cast<uint16_t>(static_cast<size_t>(index.vertex_index) + firstVertex));
+      const tinyobj::index_t index = shape.mesh.indices.at(i);
+
+      Vertex vertex;
+
+      vertex.position = { attrib.vertices[3 * index.vertex_index + 0], attrib.vertices[3 * index.vertex_index + 1],
+                          attrib.vertices[3 * index.vertex_index + 2] };
+
+      if (index.normal_index >= 0)
+      {
+        vertex.normal = { attrib.normals[3 * index.normal_index + 0], attrib.normals[3 * index.normal_index + 1],
+                          attrib.normals[3 * index.normal_index + 2] };
+      }
+      else
+      {
+        vertex.normal = { 0.0f, 0.0f, 0.0f };
+      }
+
+      switch (color)
+      {
+      case Color::White:
+        vertex.color = { 1.0f, 1.0f, 1.0f };
+        break;
+      case Color::FromNormals:
+        vertex.color = vertex.normal;
+        break;
+      }
+
+      vertices.push_back(vertex);
+      indices.push_back(static_cast<uint16_t>(indices.size()));
     }
   }
 
