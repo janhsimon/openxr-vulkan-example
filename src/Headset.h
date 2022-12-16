@@ -2,11 +2,9 @@
 
 #include <glm/mat4x4.hpp>
 
-#include <vulkan/vulkan.h>
-
-#define XR_USE_GRAPHICS_API_VULKAN
 #include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
+
+#include <vulkan/vulkan.h>
 
 #include <vector>
 
@@ -31,11 +29,18 @@ public:
 
   bool isValid() const;
   bool isExitRequested() const;
-  VkRenderPass getRenderPass() const;
+
+  XrSession getXrSession() const;
+  XrSpace getXrSpace() const;
+  XrFrameState getXrFrameState() const;
+
+  VkRenderPass getVkRenderPass() const;
+
   size_t getEyeCount() const;
   VkExtent2D getEyeResolution(size_t eyeIndex) const;
   glm::mat4 getEyeViewMatrix(size_t eyeIndex) const;
   glm::mat4 getEyeProjectionMatrix(size_t eyeIndex) const;
+
   RenderTarget* getRenderTarget(size_t swapchainImageIndex) const;
 
 private:

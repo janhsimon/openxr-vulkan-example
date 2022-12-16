@@ -53,7 +53,7 @@ bool MeshData::loadModel(const std::string& filename,
       }
 
       vertices.push_back(vertex);
-      indices.push_back(static_cast<uint16_t>(indices.size()));
+      indices.push_back(static_cast<uint32_t>(indices.size()));
     }
   }
 

@@ -536,8 +536,8 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
 
     // Update the view and projection matrices
     const XrPosef& pose = eyeRenderInfo.pose;
-    eyeViewMatrices.at(eyeIndex) = util::poseToMatrix(pose);
-    eyeProjectionMatrices.at(eyeIndex) = util::createProjectionMatrix(eyeRenderInfo.fov, 0.1f, 250.0f);
+    eyeViewMatrices.at(eyeIndex) = glm::inverse(util::poseToMatrix(pose));
+    eyeProjectionMatrices.at(eyeIndex) = util::createProjectionMatrix(eyeRenderInfo.fov, 0.01f, 250.0f);
   }
 
   // Acquire the swapchain image
@@ -609,7 +609,22 @@ bool Headset::isExitRequested() const
   return exitRequested;
 }
 
-VkRenderPass Headset::getRenderPass() const
+XrSession Headset::getXrSession() const
+{
+  return session;
+}
+
+XrSpace Headset::getXrSpace() const
+{
+  return space;
+}
+
+XrFrameState Headset::getXrFrameState() const
+{
+  return frameState;
+}
+
+VkRenderPass Headset::getVkRenderPass() const
 {
   return renderPass;
 }

@@ -46,6 +46,9 @@ bool loadShaderFromFile(VkDevice device, const std::string& filename, VkShaderMo
 // Aligns a value to an alignment
 size_t align(size_t value, VkDeviceSize alignment);
 
+// Creates a path from a name string
+XrPath stringToPath(XrInstance instance, const std::string& string);
+
 // Creates an identity pose
 XrPosef makeIdentity();
 

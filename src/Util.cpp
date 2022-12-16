@@ -127,6 +127,18 @@ VkDeviceSize util::align(VkDeviceSize value, VkDeviceSize alignment)
   return (value + alignment - 1u) & ~(alignment - 1u);
 }
 
+XrPath util::stringToPath(XrInstance instance, const std::string& string)
+{
+  XrPath path;
+  const XrResult result = xrStringToPath(instance, string.c_str(), &path);
+  if (XR_FAILED(result))
+  {
+    return XR_NULL_PATH;
+  }
+
+  return path;
+}
+
 XrPosef util::makeIdentity()
 {
   XrPosef identity;
@@ -143,7 +155,7 @@ glm::mat4 util::poseToMatrix(const XrPosef& pose)
   const glm::mat4 rotation =
     glm::toMat4(glm::quat(pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z));
 
-  return glm::inverse(translation * rotation);
+  return translation * rotation;
 }
 
 glm::mat4 util::createProjectionMatrix(XrFovf fov, float nearClip, float farClip)

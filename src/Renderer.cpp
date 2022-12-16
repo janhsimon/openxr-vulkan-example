@@ -136,7 +136,7 @@ Renderer::Renderer(const Context* context,
   vertexInputAttributeColor.offset = offsetof(Vertex, color);
 
   gridPipeline =
-    new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "shaders/Grid.vert.spv", "shaders/Grid.frag.spv",
+    new Pipeline(vkDevice, pipelineLayout, headset->getVkRenderPass(), "shaders/Grid.vert.spv", "shaders/Grid.frag.spv",
                  { vertexInputBindingDescription }, { vertexInputAttributePosition, vertexInputAttributeColor });
   if (!gridPipeline->isValid())
   {
@@ -146,7 +146,7 @@ Renderer::Renderer(const Context* context,
 
   // Create the diffuse pipeline
   diffusePipeline =
-    new Pipeline(vkDevice, pipelineLayout, headset->getRenderPass(), "shaders/Diffuse.vert.spv",
+    new Pipeline(vkDevice, pipelineLayout, headset->getVkRenderPass(), "shaders/Diffuse.vert.spv",
                  "shaders/Diffuse.frag.spv", { vertexInputBindingDescription },
                  { vertexInputAttributePosition, vertexInputAttributeNormal, vertexInputAttributeColor });
   if (!diffusePipeline->isValid())
@@ -287,7 +287,7 @@ void Renderer::render(size_t swapchainImageIndex, float time)
   const std::array clearValues = { VkClearValue({ 0.01f, 0.01f, 0.01f, 1.0f }), VkClearValue({ 1.0f, 0u }) };
 
   VkRenderPassBeginInfo renderPassBeginInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-  renderPassBeginInfo.renderPass = headset->getRenderPass();
+  renderPassBeginInfo.renderPass = headset->getVkRenderPass();
   renderPassBeginInfo.framebuffer = headset->getRenderTarget(swapchainImageIndex)->getFramebuffer();
   renderPassBeginInfo.renderArea.offset = { 0, 0 };
   renderPassBeginInfo.renderArea.extent = headset->getEyeResolution(0u);
@@ -318,7 +318,7 @@ void Renderer::render(size_t swapchainImageIndex, float time)
   vkCmdBindVertexBuffers(commandBuffer, 0u, 1u, &buffer, &vertexOffset);
 
   // Bind the index section of the geometry buffer
-  vkCmdBindIndexBuffer(commandBuffer, buffer, indexOffset, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(commandBuffer, buffer, indexOffset, VK_INDEX_TYPE_UINT32);
 
   // Draw each model
   const VkDescriptorSet descriptorSet = renderProcess->getDescriptorSet();

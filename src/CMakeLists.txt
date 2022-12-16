@@ -17,6 +17,9 @@ set(SRC
   Context.cpp
   Context.h
 
+  Controllers.cpp
+  Controllers.h
+
   Headset.cpp
   Headset.h
 

@@ -62,6 +62,9 @@ MirrorView::MirrorView(const Context* context) : context(context)
   glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
   glfwSetKeyCallback(window, keyCallback);
 
+  // Hide the mouse cursor
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+
   // Create a surface for the window
   VkResult result = glfwCreateWindowSurface(context->getVkInstance(), window, nullptr, &surface);
   if (result != VK_SUCCESS)

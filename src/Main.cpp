@@ -1,4 +1,5 @@
 #include "Context.h"
+#include "Controllers.h"
 #include "Headset.h"
 #include "MeshData.h"
 #include "MirrorView.h"
@@ -34,12 +35,25 @@ int main()
     return EXIT_FAILURE;
   }
 
-  Model gridModel, carModelLeft, carModelCenter, carModelRight;
-  std::vector<Model*> models = { &gridModel, &carModelLeft, &carModelCenter, &carModelRight };
+  Controllers controllers(context.getXrInstance(), headset.getXrSession());
+  if (!controllers.isValid())
+  {
+    return EXIT_FAILURE;
+  }
 
-  gridModel.worldMatrix = glm::mat4(1.0f);
-  carModelLeft.worldMatrix = glm::translate(glm::mat4(1.0f), { -5.0f, 0.0f, -2.0f });
-  carModelRight.worldMatrix = glm::translate(glm::mat4(1.0f), { 5.0f, 0.0f, -2.0f });
+  Model gridModel, ruinsModel, carModelLeft, carModelRight, beetleModel, bikeModel, handModelLeft, handModelRight,
+    logoModel;
+  std::vector<Model*> models = { &gridModel, &ruinsModel,    &carModelLeft,   &carModelRight, &beetleModel,
+                                 &bikeModel, &handModelLeft, &handModelRight, &logoModel };
+
+  gridModel.worldMatrix = ruinsModel.worldMatrix = glm::mat4(1.0f);
+  carModelLeft.worldMatrix =
+    glm::rotate(glm::translate(glm::mat4(1.0f), { -3.5f, 0.0f, -7.0f }), glm::radians(75.0f), { 0.0f, 1.0f, 0.0f });
+  carModelRight.worldMatrix =
+    glm::rotate(glm::translate(glm::mat4(1.0f), { 8.0f, 0.0f, -15.0f }), glm::radians(-15.0f), { 0.0f, 1.0f, 0.0f });
+  beetleModel.worldMatrix =
+    glm::rotate(glm::translate(glm::mat4(1.0f), { -3.5f, 0.0f, -0.5f }), glm::radians(-125.0f), { 0.0f, 1.0f, 0.0f });
+  logoModel.worldMatrix = glm::translate(glm::mat4(1.0f), { 0.0f, 3.0f, -10.0f });
 
   MeshData* meshData = new MeshData;
   if (!meshData->loadModel("models/Grid.obj", MeshData::Color::FromNormals, models, 0u, 1u))
@@ -47,7 +61,32 @@ int main()
     return EXIT_FAILURE;
   }
 
-  if (!meshData->loadModel("models/Car.obj", MeshData::Color::White, models, 1u, 3u))
+  if (!meshData->loadModel("models/Ruins.obj", MeshData::Color::White, models, 1u, 1u))
+  {
+    return EXIT_FAILURE;
+  }
+
+  if (!meshData->loadModel("models/Car.obj", MeshData::Color::White, models, 2u, 2u))
+  {
+    return EXIT_FAILURE;
+  }
+
+  if (!meshData->loadModel("models/Beetle.obj", MeshData::Color::White, models, 4u, 1u))
+  {
+    return EXIT_FAILURE;
+  }
+
+  if (!meshData->loadModel("models/Bike.obj", MeshData::Color::White, models, 5u, 1u))
+  {
+    return EXIT_FAILURE;
+  }
+
+  if (!meshData->loadModel("models/Hand.obj", MeshData::Color::White, models, 6u, 2u))
+  {
+    return EXIT_FAILURE;
+  }
+
+  if (!meshData->loadModel("models/Logo.obj", MeshData::Color::White, models, 8u, 1u))
   {
     return EXIT_FAILURE;
   }
@@ -86,12 +125,20 @@ int main()
     }
     else if (frameResult == Headset::BeginFrameResult::RenderFully)
     {
+      if (!controllers.sync(headset.getXrSpace(), headset.getXrFrameState().predictedDisplayTime))
+      {
+        return EXIT_FAILURE;
+      }
+
       // Update
       static float time = 0.0f;
       time += deltaTime;
 
-      carModelCenter.worldMatrix =
-        glm::rotate(glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, -3.0f }), time * 0.2f, { 0.0f, 1.0f, 0.0f });
+      bikeModel.worldMatrix =
+        glm::rotate(glm::translate(glm::mat4(1.0f), { 0.5f, 0.0f, -4.5f }), time * 0.2f, { 0.0f, 1.0f, 0.0f });
+
+      handModelLeft.worldMatrix = controllers.getTransform(0u);
+      handModelRight.worldMatrix = glm::scale(controllers.getTransform(1u), { -1.0f, 1.0f, 1.0f });
 
       // Render
       renderer.render(swapchainImageIndex, time);
