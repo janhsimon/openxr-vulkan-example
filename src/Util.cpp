@@ -117,6 +117,16 @@ bool util::loadShaderFromFile(VkDevice device, const std::string& filename, VkSh
   return true;
 }
 
+VkDeviceSize util::align(VkDeviceSize value, VkDeviceSize alignment)
+{
+  if (value == 0u)
+  {
+    return value;
+  }
+
+  return (value + alignment - 1u) & ~(alignment - 1u);
+}
+
 XrPosef util::makeIdentity()
 {
   XrPosef identity;

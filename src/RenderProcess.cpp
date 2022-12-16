@@ -3,20 +3,28 @@
 #include "Buffer.h"
 #include "Util.h"
 
-#include <array>
-
 RenderProcess::RenderProcess(VkDevice device,
                              VkPhysicalDevice physicalDevice,
                              VkCommandPool commandPool,
                              VkDescriptorPool descriptorPool,
-                             VkDescriptorSetLayout descriptorSetLayout)
-: device(device)
+                             VkDescriptorSetLayout descriptorSetLayout,
+                             size_t numModels,
+                             VkDeviceSize uniformBufferOffsetAlignment)
+: device(device), uniformBufferOffsetAlignment(uniformBufferOffsetAlignment)
 {
   // Initialize the uniform buffer data
-  uniformBufferData.world = glm::mat4(1.0f);
-  uniformBufferData.viewProjection[0] = glm::mat4(1.0f);
-  uniformBufferData.viewProjection[1] = glm::mat4(1.0f);
-  uniformBufferData.time = 0.0f;
+  dynamicVertexUniformData.resize(numModels);
+  for (size_t modelIndex = 0u; modelIndex < numModels; ++modelIndex)
+  {
+    dynamicVertexUniformData.at(modelIndex).worldMatrix = glm::mat4(1.0f);
+  }
+
+  for (glm::mat4& viewProjectionMatrix : staticVertexUniformData.viewProjectionMatrices)
+  {
+    viewProjectionMatrix = glm::mat4(1.0f);
+  }
+
+  staticFragmentUniformData.time = 0.0f;
 
   // Allocate a command buffer
   VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
@@ -56,8 +64,22 @@ RenderProcess::RenderProcess(VkDevice device,
     return;
   }
 
+  // Partition the uniform buffer data
+  std::array<VkDescriptorBufferInfo, 3u> descriptorBufferInfos;
+
+  descriptorBufferInfos.at(0u).offset = 0u;
+  descriptorBufferInfos.at(0u).range = sizeof(DynamicVertexUniformData);
+
+  descriptorBufferInfos.at(1u).offset = util::align(descriptorBufferInfos.at(0u).range, uniformBufferOffsetAlignment) *
+                                        static_cast<VkDeviceSize>(numModels);
+  descriptorBufferInfos.at(1u).range = sizeof(StaticVertexUniformData);
+
+  descriptorBufferInfos.at(2u).offset =
+    descriptorBufferInfos.at(1u).offset + util::align(descriptorBufferInfos.at(1u).range, uniformBufferOffsetAlignment);
+  descriptorBufferInfos.at(2u).range = sizeof(StaticFragmentUniformData);
+
   // Create an empty uniform buffer
-  constexpr VkDeviceSize uniformBufferSize = static_cast<VkDeviceSize>(sizeof(UniformBufferData));
+  const VkDeviceSize uniformBufferSize = descriptorBufferInfos.at(2u).offset + descriptorBufferInfos.at(2u).range;
   uniformBuffer =
     new Buffer(device, physicalDevice, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBufferSize);
@@ -88,18 +110,14 @@ RenderProcess::RenderProcess(VkDevice device,
     return;
   }
 
-  // Associate the descriptor set with the uniform buffer
-  std::array<VkDescriptorBufferInfo, 2u> descriptorBufferInfos;
+  // Associate the uniform buffer with each descriptor buffer info
+  for (VkDescriptorBufferInfo& descriptorBufferInfo : descriptorBufferInfos)
+  {
+    descriptorBufferInfo.buffer = uniformBuffer->getVkBuffer();
+  }
 
-  descriptorBufferInfos.at(0u).buffer = uniformBuffer->getVkBuffer();
-  descriptorBufferInfos.at(0u).offset = 0u;
-  descriptorBufferInfos.at(0u).range = offsetof(UniformBufferData, time);
-
-  descriptorBufferInfos.at(1u).buffer = uniformBuffer->getVkBuffer();
-  descriptorBufferInfos.at(1u).offset = descriptorBufferInfos.at(0u).range;
-  descriptorBufferInfos.at(1u).range = sizeof(float);
-
-  std::array<VkWriteDescriptorSet, 2u> writeDescriptorSets;
+  // Update the descriptor sets
+  std::array<VkWriteDescriptorSet, 3u> writeDescriptorSets;
 
   writeDescriptorSets.at(0u).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
   writeDescriptorSets.at(0u).pNext = nullptr;
@@ -107,7 +125,7 @@ RenderProcess::RenderProcess(VkDevice device,
   writeDescriptorSets.at(0u).dstBinding = 0u;
   writeDescriptorSets.at(0u).dstArrayElement = 0u;
   writeDescriptorSets.at(0u).descriptorCount = 1u;
-  writeDescriptorSets.at(0u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  writeDescriptorSets.at(0u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
   writeDescriptorSets.at(0u).pBufferInfo = &descriptorBufferInfos.at(0u);
   writeDescriptorSets.at(0u).pImageInfo = nullptr;
   writeDescriptorSets.at(0u).pTexelBufferView = nullptr;
@@ -122,6 +140,17 @@ RenderProcess::RenderProcess(VkDevice device,
   writeDescriptorSets.at(1u).pBufferInfo = &descriptorBufferInfos.at(1u);
   writeDescriptorSets.at(1u).pImageInfo = nullptr;
   writeDescriptorSets.at(1u).pTexelBufferView = nullptr;
+
+  writeDescriptorSets.at(2u).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSets.at(2u).pNext = nullptr;
+  writeDescriptorSets.at(2u).dstSet = descriptorSet;
+  writeDescriptorSets.at(2u).dstBinding = 2u;
+  writeDescriptorSets.at(2u).dstArrayElement = 0u;
+  writeDescriptorSets.at(2u).descriptorCount = 1u;
+  writeDescriptorSets.at(2u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  writeDescriptorSets.at(2u).pBufferInfo = &descriptorBufferInfos.at(2u);
+  writeDescriptorSets.at(2u).pImageInfo = nullptr;
+  writeDescriptorSets.at(2u).pTexelBufferView = nullptr;
 
   vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u,
                          nullptr);
@@ -191,5 +220,18 @@ void RenderProcess::updateUniformBufferData() const
     return;
   }
 
-  memcpy(uniformBufferMemory, &uniformBufferData, sizeof(UniformBufferData));
+  char* offset = static_cast<char*>(uniformBufferMemory);
+  VkDeviceSize length = sizeof(DynamicVertexUniformData);
+  for (const DynamicVertexUniformData& dynamicData : dynamicVertexUniformData)
+  {
+    memcpy(offset, &dynamicData, length);
+    offset += util::align(length, uniformBufferOffsetAlignment);
+  }
+
+  length = sizeof(StaticVertexUniformData);
+  memcpy(offset, &staticVertexUniformData, length);
+  offset += util::align(length, uniformBufferOffsetAlignment);
+
+  length = sizeof(StaticFragmentUniformData);
+  memcpy(offset, &staticFragmentUniformData, length);
 }

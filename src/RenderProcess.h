@@ -4,6 +4,9 @@
 
 #include <vulkan/vulkan.h>
 
+#include <array>
+#include <vector>
+
 class Buffer;
 
 class RenderProcess final
@@ -13,16 +16,26 @@ public:
                 VkPhysicalDevice physicalDevice,
                 VkCommandPool commandPool,
                 VkDescriptorPool descriptorPool,
-                VkDescriptorSetLayout descriptorSetLayout);
+                VkDescriptorSetLayout descriptorSetLayout,
+                size_t numModels,
+                VkDeviceSize uniformBufferOffsetAlignment);
   ~RenderProcess();
 
-  struct UniformBufferData final
+  struct DynamicVertexUniformData
   {
-    glm::mat4 world;
-    glm::mat4 viewProjection[2]; // View projection matrices, 0 = left eye, 1 = right eye
-    glm::mat4 padding;           // Pad to 256 bytes
-    float time;                  // For animation
-  } uniformBufferData;
+    glm::mat4 worldMatrix;
+  };
+  std::vector<DynamicVertexUniformData> dynamicVertexUniformData;
+
+  struct StaticVertexUniformData
+  {
+    std::array<glm::mat4, 2u> viewProjectionMatrices; // 0 = left eye, 1 = right eye
+  } staticVertexUniformData;
+
+  struct StaticFragmentUniformData
+  {
+    float time;
+  } staticFragmentUniformData;
 
   bool isValid() const;
   VkCommandBuffer getCommandBuffer() const;
@@ -43,4 +56,5 @@ private:
   Buffer* uniformBuffer = nullptr;
   void* uniformBufferMemory = nullptr;
   VkDescriptorSet descriptorSet = nullptr;
+  VkDeviceSize uniformBufferOffsetAlignment = 0u;
 };

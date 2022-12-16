@@ -1,10 +1,15 @@
-#include "ModelLoader.h"
+#include "MeshData.h"
 
+#include "Model.h"
 #include "Util.h"
 
 #include <tinyobjloader/tiny_obj_loader.h>
 
-bool ModelLoader::loadModel(const std::string& filename, Color color)
+bool MeshData::loadModel(const std::string& filename,
+                         Color color,
+                         std::vector<Model*>& models,
+                         size_t offset,
+                         size_t count)
 {
   tinyobj::attrib_t attrib;
   std::vector<tinyobj::shape_t> shapes;
@@ -52,37 +57,30 @@ bool ModelLoader::loadModel(const std::string& filename, Color color)
     }
   }
 
-  numIndicesPerModel.push_back(indices.size() - oldIndexCount);
+  for (size_t modelIndex = offset; modelIndex < offset + count; ++modelIndex)
+  {
+    Model* model = models.at(modelIndex);
+    model->firstIndex = oldIndexCount;
+    model->numIndices = indices.size() - oldIndexCount;
+  }
 
   return true;
 }
 
-size_t ModelLoader::getVerticesSize() const
+size_t MeshData::getSize() const
+{
+  return sizeof(vertices.at(0u)) * vertices.size() + sizeof(indices.at(0u)) * indices.size();
+}
+
+size_t MeshData::getIndexOffset() const
 {
   return sizeof(vertices.at(0u)) * vertices.size();
 }
 
-const Vertex* ModelLoader::getVerticesData() const
+void MeshData::writeTo(char* destination) const
 {
-  return vertices.data();
-}
-
-size_t ModelLoader::getNumIndices() const
-{
-  return indices.size();
-}
-
-size_t ModelLoader::getNumIndicesPerModel(size_t model) const
-{
-  return numIndicesPerModel.at(model);
-}
-
-size_t ModelLoader::getIndicesSize() const
-{
-  return sizeof(indices.at(0u)) * indices.size();
-}
-
-const uint16_t* ModelLoader::getIndicesData() const
-{
-  return indices.data();
+  const size_t verticesSize = sizeof(vertices.at(0u)) * vertices.size();
+  const size_t indicesSize = sizeof(indices.at(0u)) * indices.size();
+  memcpy(destination, vertices.data(), verticesSize);              // Vertex section first
+  memcpy(destination + verticesSize, indices.data(), indicesSize); // Index section next
 }

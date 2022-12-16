@@ -1,24 +1,16 @@
 #include "Context.h"
 #include "Headset.h"
+#include "MeshData.h"
 #include "MirrorView.h"
-#include "ModelLoader.h"
+#include "Model.h"
 #include "Renderer.h"
+
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <chrono>
 
 int main()
 {
-  ModelLoader* modelLoader = new ModelLoader;
-  if (!modelLoader->loadModel("models/Grid.obj", ModelLoader::Color::FromNormals))
-  {
-    return EXIT_FAILURE;
-  }
-
-  if (!modelLoader->loadModel("models/Car.obj", ModelLoader::Color::White))
-  {
-    return EXIT_FAILURE;
-  }
-
   Context context;
   if (!context.isValid())
   {
@@ -42,13 +34,31 @@ int main()
     return EXIT_FAILURE;
   }
 
-  Renderer renderer(&context, &headset, modelLoader);
+  Model gridModel, carModelLeft, carModelCenter, carModelRight;
+  std::vector<Model*> models = { &gridModel, &carModelLeft, &carModelCenter, &carModelRight };
+
+  gridModel.worldMatrix = glm::mat4(1.0f);
+  carModelLeft.worldMatrix = glm::translate(glm::mat4(1.0f), { -5.0f, 0.0f, -2.0f });
+  carModelRight.worldMatrix = glm::translate(glm::mat4(1.0f), { 5.0f, 0.0f, -2.0f });
+
+  MeshData* meshData = new MeshData;
+  if (!meshData->loadModel("models/Grid.obj", MeshData::Color::FromNormals, models, 0u, 1u))
+  {
+    return EXIT_FAILURE;
+  }
+
+  if (!meshData->loadModel("models/Car.obj", MeshData::Color::White, models, 1u, 3u))
+  {
+    return EXIT_FAILURE;
+  }
+
+  Renderer renderer(&context, &headset, meshData, models);
   if (!renderer.isValid())
   {
     return EXIT_FAILURE;
   }
 
-  delete modelLoader;
+  delete meshData;
 
   if (!mirrorView.connect(&headset, &renderer))
   {
@@ -76,7 +86,15 @@ int main()
     }
     else if (frameResult == Headset::BeginFrameResult::RenderFully)
     {
-      renderer.render(swapchainImageIndex, deltaTime);
+      // Update
+      static float time = 0.0f;
+      time += deltaTime;
+
+      carModelCenter.worldMatrix =
+        glm::rotate(glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, -3.0f }), time * 0.2f, { 0.0f, 1.0f, 0.0f });
+
+      // Render
+      renderer.render(swapchainImageIndex, time);
 
       const MirrorView::RenderResult mirrorResult = mirrorView.render(swapchainImageIndex);
       if (mirrorResult == MirrorView::RenderResult::Error)

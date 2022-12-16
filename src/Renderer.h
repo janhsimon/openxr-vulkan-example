@@ -7,17 +7,18 @@
 class Buffer;
 class Context;
 class Headset;
-class ModelLoader;
+class MeshData;
+struct Model;
 class Pipeline;
 class RenderProcess;
 
 class Renderer final
 {
 public:
-  Renderer(const Context* context, const Headset* headset, const ModelLoader* modelLoader);
+  Renderer(const Context* context, const Headset* headset, const MeshData* meshData, const std::vector<Model*>& models);
   ~Renderer();
 
-  void render(size_t swapchainImageIndex, float deltaTime);
+  void render(size_t swapchainImageIndex, float time);
   void submit(bool useSemaphores) const;
 
   bool isValid() const;
@@ -37,8 +38,9 @@ private:
   std::vector<RenderProcess*> renderProcesses;
   VkPipelineLayout pipelineLayout = nullptr;
   Pipeline *gridPipeline = nullptr, *diffusePipeline = nullptr;
-  Buffer* geometryBuffer = nullptr;
-  size_t geometryBufferIndexOffset = 0u;
-  uint32_t numIndices = 0u, numGridIndices = 0u;
+  Buffer* vertexIndexBuffer = nullptr;
+  std::vector<Model*> models;
+  size_t indexOffset = 0u;
   size_t currentRenderProcessIndex = 0u;
+  VkDeviceSize uniformBufferOffsetAlignment = 0u;
 };

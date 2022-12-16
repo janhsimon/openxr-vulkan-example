@@ -3,13 +3,12 @@
 #include "Buffer.h"
 #include "Context.h"
 #include "Headset.h"
-#include "ModelLoader.h"
+#include "MeshData.h"
+#include "Model.h"
 #include "Pipeline.h"
 #include "RenderProcess.h"
 #include "RenderTarget.h"
 #include "Util.h"
-
-#include <glm/gtc/matrix_transform.hpp>
 
 #include <array>
 
@@ -18,8 +17,11 @@ namespace
 constexpr size_t numFramesInFlight = 2u;
 } // namespace
 
-Renderer::Renderer(const Context* context, const Headset* headset, const ModelLoader* modelLoader)
-: context(context), headset(headset)
+Renderer::Renderer(const Context* context,
+                   const Headset* headset,
+                   const MeshData* meshData,
+                   const std::vector<Model*>& models)
+: context(context), headset(headset), models(models)
 {
   const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   const VkDevice vkDevice = context->getVkDevice();
@@ -52,17 +54,22 @@ Renderer::Renderer(const Context* context, const Headset* headset, const ModelLo
   }
 
   // Create a descriptor set layout
-  std::array<VkDescriptorSetLayoutBinding, 2u> descriptorSetLayoutBindings;
+  std::array<VkDescriptorSetLayoutBinding, 3u> descriptorSetLayoutBindings;
 
   descriptorSetLayoutBindings.at(0u).binding = 0u;
-  descriptorSetLayoutBindings.at(0u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descriptorSetLayoutBindings.at(0u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
   descriptorSetLayoutBindings.at(0u).descriptorCount = 1u;
   descriptorSetLayoutBindings.at(0u).stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
   descriptorSetLayoutBindings.at(1u).binding = 1u;
   descriptorSetLayoutBindings.at(1u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   descriptorSetLayoutBindings.at(1u).descriptorCount = 1u;
-  descriptorSetLayoutBindings.at(1u).stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+  descriptorSetLayoutBindings.at(1u).stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+  descriptorSetLayoutBindings.at(2u).binding = 2u;
+  descriptorSetLayoutBindings.at(2u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descriptorSetLayoutBindings.at(2u).descriptorCount = 1u;
+  descriptorSetLayoutBindings.at(2u).stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
   VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
   descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
@@ -86,11 +93,17 @@ Renderer::Renderer(const Context* context, const Headset* headset, const ModelLo
     return;
   }
 
+  // Retrieve the physical device properties
+  VkPhysicalDeviceProperties physicalDeviceProperties;
+  vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
+  uniformBufferOffsetAlignment = physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
+
   // Create a render process for each frame in flight
   renderProcesses.resize(numFramesInFlight);
   for (RenderProcess*& renderProcess : renderProcesses)
   {
-    renderProcess = new RenderProcess(vkDevice, vkPhysicalDevice, commandPool, descriptorPool, descriptorSetLayout);
+    renderProcess = new RenderProcess(vkDevice, vkPhysicalDevice, commandPool, descriptorPool, descriptorSetLayout,
+                                      models.size(), uniformBufferOffsetAlignment);
     if (!renderProcess->isValid())
     {
       valid = false;
@@ -142,13 +155,10 @@ Renderer::Renderer(const Context* context, const Headset* headset, const ModelLo
     return;
   }
 
-  // Create a geometry buffer
+  // Create a vertex index buffer
   {
-    const size_t verticesSize = geometryBufferIndexOffset = modelLoader->getVerticesSize();
-    const size_t indicesSize = modelLoader->getIndicesSize();
-
     // Create a staging buffer
-    const VkDeviceSize bufferSize = static_cast<VkDeviceSize>(verticesSize + indicesSize);
+    const VkDeviceSize bufferSize = static_cast<VkDeviceSize>(meshData->getSize());
     Buffer* stagingBuffer =
       new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize);
@@ -158,7 +168,7 @@ Renderer::Renderer(const Context* context, const Headset* headset, const ModelLo
       return;
     }
 
-    // Fill the staging buffer with geometry data
+    // Fill the staging buffer with vertex and index data
     char* bufferData = static_cast<char*>(stagingBuffer->map());
     if (!bufferData)
     {
@@ -166,23 +176,23 @@ Renderer::Renderer(const Context* context, const Headset* headset, const ModelLo
       return;
     }
 
-    memcpy(bufferData, modelLoader->getVerticesData(), verticesSize);              // Vertex section first
-    memcpy(bufferData + verticesSize, modelLoader->getIndicesData(), indicesSize); // Index section next
+    meshData->writeTo(bufferData);
     stagingBuffer->unmap();
 
     // Create an empty target buffer
-    geometryBuffer = new Buffer(vkDevice, vkPhysicalDevice,
-                                VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                                  VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize);
-    if (!geometryBuffer->isValid())
+    vertexIndexBuffer = new Buffer(vkDevice, vkPhysicalDevice,
+                                   VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize);
+    if (!vertexIndexBuffer->isValid())
     {
       valid = false;
       return;
     }
 
     // Copy from the staging to the target buffer
-    if (!stagingBuffer->copyTo(*geometryBuffer, renderProcesses.at(0u)->getCommandBuffer(), context->getVkDrawQueue()))
+    if (!stagingBuffer->copyTo(*vertexIndexBuffer, renderProcesses.at(0u)->getCommandBuffer(),
+                               context->getVkDrawQueue()))
     {
       valid = false;
       return;
@@ -192,13 +202,12 @@ Renderer::Renderer(const Context* context, const Headset* headset, const ModelLo
     delete stagingBuffer;
   }
 
-  numIndices = static_cast<uint32_t>(modelLoader->getNumIndices());
-  numGridIndices = static_cast<uint32_t>(modelLoader->getNumIndicesPerModel(0u));
+  indexOffset = meshData->getIndexOffset();
 }
 
 Renderer::~Renderer()
 {
-  delete geometryBuffer;
+  delete vertexIndexBuffer;
   delete diffusePipeline;
   delete gridPipeline;
 
@@ -232,7 +241,7 @@ Renderer::~Renderer()
   }
 }
 
-void Renderer::render(size_t swapchainImageIndex, float deltaTime)
+void Renderer::render(size_t swapchainImageIndex, float time)
 {
   currentRenderProcessIndex = (currentRenderProcessIndex + 1u) % renderProcesses.size();
 
@@ -259,19 +268,18 @@ void Renderer::render(size_t swapchainImageIndex, float deltaTime)
 
   // Update the uniform buffer data
   {
-    static float time = 0.0f;
-
-    renderProcess->uniformBufferData.world =
-      glm::rotate(glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, -3.0f }), time * 0.2f, { 0.0f, 1.0f, 0.0f });
+    for (size_t modelIndex = 0u; modelIndex < models.size(); ++modelIndex)
+    {
+      renderProcess->dynamicVertexUniformData.at(modelIndex).worldMatrix = models.at(modelIndex)->worldMatrix;
+    }
 
     for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
     {
-      renderProcess->uniformBufferData.viewProjection[eyeIndex] =
+      renderProcess->staticVertexUniformData.viewProjectionMatrices.at(eyeIndex) =
         headset->getEyeProjectionMatrix(eyeIndex) * headset->getEyeViewMatrix(eyeIndex);
     }
 
-    renderProcess->uniformBufferData.time = time;
-    time += deltaTime;
+    renderProcess->staticFragmentUniformData.time = time;
 
     renderProcess->updateUniformBufferData();
   }
@@ -305,25 +313,39 @@ void Renderer::render(size_t swapchainImageIndex, float deltaTime)
   vkCmdSetScissor(commandBuffer, 0u, 1u, &scissor);
 
   // Bind the vertex section of the geometry buffer
-  VkDeviceSize offset = 0u;
-  const VkBuffer buffer = geometryBuffer->getVkBuffer();
-  vkCmdBindVertexBuffers(commandBuffer, 0u, 1u, &buffer, &offset);
+  VkDeviceSize vertexOffset = 0u;
+  const VkBuffer buffer = vertexIndexBuffer->getVkBuffer();
+  vkCmdBindVertexBuffers(commandBuffer, 0u, 1u, &buffer, &vertexOffset);
 
   // Bind the index section of the geometry buffer
-  vkCmdBindIndexBuffer(commandBuffer, buffer, geometryBufferIndexOffset, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(commandBuffer, buffer, indexOffset, VK_INDEX_TYPE_UINT16);
 
-  // Bind the uniform buffer
+  // Draw each model
   const VkDescriptorSet descriptorSet = renderProcess->getDescriptorSet();
-  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0u, 1u, &descriptorSet, 0u,
-                          nullptr);
+  for (size_t modelIndex = 0u; modelIndex < models.size(); ++modelIndex)
+  {
+    const Model* model = models.at(modelIndex);
 
-  // Draw the grid
-  gridPipeline->bind(commandBuffer);
-  vkCmdDrawIndexed(commandBuffer, numGridIndices, 1u, 0u, 0u, 0u);
+    // Bind the uniform buffer
+    const uint32_t uniformBufferOffset =
+      static_cast<uint32_t>(util::align(sizeof(RenderProcess::DynamicVertexUniformData), uniformBufferOffsetAlignment) *
+                            static_cast<VkDeviceSize>(modelIndex));
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0u, 1u, &descriptorSet, 1u,
+                            &uniformBufferOffset);
 
-  // Draw the scene
-  diffusePipeline->bind(commandBuffer);
-  vkCmdDrawIndexed(commandBuffer, numIndices - numGridIndices, 1u, numGridIndices, 0u, 0u);
+    // Bind the pipeline
+    if (modelIndex == 0u)
+    {
+      gridPipeline->bind(commandBuffer);
+    }
+    else if (modelIndex == 1u)
+    {
+      diffusePipeline->bind(commandBuffer);
+    }
+
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(model->numIndices), 1u,
+                     static_cast<uint32_t>(model->firstIndex), 0u, 0u);
+  }
 
   vkCmdEndRenderPass(commandBuffer);
 }

@@ -43,6 +43,9 @@ std::vector<const char*> unpackExtensionString(const std::string& string);
 // Loads a shader from 'file' into 'shaderModule', returns false on error
 bool loadShaderFromFile(VkDevice device, const std::string& filename, VkShaderModule& shaderModule);
 
+// Aligns a value to an alignment
+size_t align(size_t value, VkDeviceSize alignment);
+
 // Creates an identity pose
 XrPosef makeIdentity();
 

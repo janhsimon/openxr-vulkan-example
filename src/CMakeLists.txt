@@ -20,11 +20,13 @@ set(SRC
   Headset.cpp
   Headset.h
 
+  MeshData.cpp
+  MeshData.h
+
   MirrorView.cpp
   MirrorView.h
 
-  ModelLoader.cpp
-  ModelLoader.h
+  Model.h
 
   Pipeline.cpp
   Pipeline.h
@@ -40,8 +42,6 @@ set(SRC
 
   Util.cpp
   Util.h
-
-  Vertex.h
 
   ${SHADER_SRC}
 )
