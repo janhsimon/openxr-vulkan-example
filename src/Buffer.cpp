@@ -29,14 +29,14 @@ Buffer::Buffer(const VkDevice device,
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, &supportedMemoryProperties);
 
   const VkMemoryPropertyFlags typeFilter = memoryRequirements.memoryTypeBits;
-  uint32_t memoryTypeIndex = 0u;
+  uint32_t suitableMemoryTypeIndex = 0u;
   bool memoryTypeFound = false;
-  for (uint32_t i = 0u; i < supportedMemoryProperties.memoryTypeCount; ++i)
+  for (uint32_t memoryTypeIndex = 0u; memoryTypeIndex < supportedMemoryProperties.memoryTypeCount; ++memoryTypeIndex)
   {
-    const VkMemoryPropertyFlags propertyFlags = supportedMemoryProperties.memoryTypes[i].propertyFlags;
-    if (typeFilter & (1 << i) && (propertyFlags & memoryProperties) == memoryProperties)
+    const VkMemoryPropertyFlags propertyFlags = supportedMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+    if (typeFilter & (1 << memoryTypeIndex) && (propertyFlags & memoryProperties) == memoryProperties)
     {
-      memoryTypeIndex = i;
+      suitableMemoryTypeIndex = memoryTypeIndex;
       memoryTypeFound = true;
       break;
     }
@@ -51,7 +51,7 @@ Buffer::Buffer(const VkDevice device,
 
   VkMemoryAllocateInfo memoryAllocateInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
   memoryAllocateInfo.allocationSize = memoryRequirements.size;
-  memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
+  memoryAllocateInfo.memoryTypeIndex = suitableMemoryTypeIndex;
   if (vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &deviceMemory) != VK_SUCCESS)
   {
     std::stringstream s;

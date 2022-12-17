@@ -4,9 +4,7 @@
 
 #include <vulkan/vulkan.h>
 
-#define XR_USE_GRAPHICS_API_VULKAN
 #include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
 
 #include <string>
 #include <vector>
@@ -26,6 +24,9 @@ enum class Error
   WindowFailure
 };
 
+/*
+ * The util namespaces offers a wide variety of useful utility functions.
+ */
 namespace util
 {
 // Reports an error with optional details through a system-native message box

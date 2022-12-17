@@ -5,6 +5,10 @@
 #include <string>
 #include <vector>
 
+/*
+ * The pipeline class wraps a Vulkan pipeline for convenience. It describes the rendering technique to use, including
+ * shaders, culling, scissoring, and other aspects.
+ */
 class Pipeline final
 {
 public:

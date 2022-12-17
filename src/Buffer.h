@@ -2,6 +2,11 @@
 
 #include <vulkan/vulkan.h>
 
+/*
+ * The buffer class is used to store Vulkan data buffers, namely the uniform buffer and the vertex/index buffer. It is
+ * unrelated to Vulkan image buffers used for the depth buffer for example. Note that is good for performance to keep
+ * Vulkan buffers mapped until destruction. This class offers functionality to do so, but doesn't enfore the principle.
+ */
 class Buffer final
 {
 public:

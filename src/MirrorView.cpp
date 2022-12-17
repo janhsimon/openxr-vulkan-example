@@ -8,6 +8,8 @@
 
 #include <glfw/glfw3.h>
 
+#include <glm/common.hpp>
+
 #include <sstream>
 
 namespace

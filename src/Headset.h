@@ -1,6 +1,6 @@
 #pragma once
 
-#include <glm/mat4x4.hpp>
+#include <glm/fwd.hpp>
 
 #include <openxr/openxr.h>
 
@@ -11,6 +11,12 @@
 class Context;
 class RenderTarget;
 
+/*
+ * The headset class facilitates rendering into the device. It holds functionality to begin and end rendering a frame,
+ * to find out when the user has quit the application through the headset's operating system, as opposed to the mirror
+ * view window, and to retrieve the current orientation of the device. It relies on both OpenXR and Vulkan to provide
+ * these features.
+ */
 class Headset final
 {
 public:

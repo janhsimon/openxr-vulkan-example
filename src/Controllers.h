@@ -6,6 +6,11 @@
 
 #include <vector>
 
+/*
+ * The controllers class handles OpenXR controller support. It represents the controller system as a whole, not an
+ * individual controller. This is more convenient due to the OpenXR API. It allows the application to retrieve the
+ * current transform of a controller, which is then used to accuretely pose the hand models in the scene.
+ */
 class Controllers final
 {
 public:
@@ -20,10 +25,10 @@ public:
 private:
   bool valid = true;
 
-  XrSession session;
+  XrSession session = nullptr;
   std::vector<XrPath> paths;
-  XrActionSet actionSet;
-  XrAction action;
+  XrActionSet actionSet = nullptr;
+  XrAction action = nullptr;
   std::vector<XrSpace> spaces;
   std::vector<glm::mat4> transforms;
 };

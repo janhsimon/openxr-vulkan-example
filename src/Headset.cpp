@@ -4,6 +4,8 @@
 #include "RenderTarget.h"
 #include "Util.h"
 
+#include <glm/mat4x4.hpp>
+
 #include <array>
 #include <sstream>
 
@@ -226,14 +228,14 @@ Headset::Headset(const Context* context) : context(context)
 
     const VkMemoryPropertyFlags memoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     const VkMemoryPropertyFlags typeFilter = memoryRequirements.memoryTypeBits;
-    uint32_t memoryTypeIndex = 0u;
+    uint32_t suitableMemoryTypeIndex = 0u;
     bool memoryTypeFound = false;
-    for (uint32_t i = 0u; i < supportedMemoryProperties.memoryTypeCount; ++i)
+    for (uint32_t memoryTypeIndex = 0u; memoryTypeIndex < supportedMemoryProperties.memoryTypeCount; ++memoryTypeIndex)
     {
-      const VkMemoryPropertyFlags propertyFlags = supportedMemoryProperties.memoryTypes[i].propertyFlags;
-      if (typeFilter & (1 << i) && (propertyFlags & memoryProperties) == memoryProperties)
+      const VkMemoryPropertyFlags propertyFlags = supportedMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+      if (typeFilter & (1 << memoryTypeIndex) && (propertyFlags & memoryProperties) == memoryProperties)
       {
-        memoryTypeIndex = i;
+        suitableMemoryTypeIndex = memoryTypeIndex;
         memoryTypeFound = true;
         break;
       }
@@ -248,7 +250,7 @@ Headset::Headset(const Context* context) : context(context)
 
     VkMemoryAllocateInfo memoryAllocateInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     memoryAllocateInfo.allocationSize = memoryRequirements.size;
-    memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
+    memoryAllocateInfo.memoryTypeIndex = suitableMemoryTypeIndex;
     if (vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &depthMemory) != VK_SUCCESS)
     {
       std::stringstream s;

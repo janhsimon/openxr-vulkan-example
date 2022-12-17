@@ -9,6 +9,11 @@ struct GLFWwindow;
 class Headset;
 class Renderer;
 
+/*
+ * The mirror view class handles the creation, updating, resizing, and eventual closing of the desktop window that shows
+ * a copy of what is rendered into the headset. It depends on GLFW for handling the operating system, and Vulkan for the
+ * blitting into the window surface.
+ */
 class MirrorView final
 {
 public:

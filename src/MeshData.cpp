@@ -23,10 +23,8 @@ bool MeshData::loadModel(const std::string& filename,
 
   for (const tinyobj::shape_t& shape : shapes)
   {
-    for (size_t i = 0u; i < shape.mesh.indices.size(); ++i)
+    for (const tinyobj::index_t& index : shape.mesh.indices)
     {
-      const tinyobj::index_t index = shape.mesh.indices.at(i);
-
       Vertex vertex;
 
       vertex.position = { attrib.vertices[3 * index.vertex_index + 0], attrib.vertices[3 * index.vertex_index + 1],

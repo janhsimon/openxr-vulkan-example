@@ -2,6 +2,10 @@
 
 #include <vulkan/vulkan.h>
 
+/*
+ * The render target class represents a convenient combination of an image and a framebuffer in Vulkan. The class is
+ * used for the Vulkan swapchain images retrieved by OpenXR for the headset displays.
+ */
 class RenderTarget final
 {
 public:

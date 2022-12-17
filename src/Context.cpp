@@ -285,9 +285,9 @@ Context::Context()
       return;
     }
 
-    for (uint32_t i = 0u; i < requiredExtensionCount; ++i)
+    for (uint32_t extensionIndex = 0u; extensionIndex < requiredExtensionCount; ++extensionIndex)
     {
-      vulkanInstanceExtensions.push_back(buffer[i]);
+      vulkanInstanceExtensions.push_back(buffer[extensionIndex]);
     }
   }
 
