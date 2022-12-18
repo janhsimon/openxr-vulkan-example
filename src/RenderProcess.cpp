@@ -3,6 +3,8 @@
 #include "Buffer.h"
 #include "Util.h"
 
+#include <cstring>
+
 RenderProcess::RenderProcess(VkDevice device,
                              VkPhysicalDevice physicalDevice,
                              VkCommandPool commandPool,

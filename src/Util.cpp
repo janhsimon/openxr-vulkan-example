@@ -4,6 +4,7 @@
 
 #include <boxer/boxer.h>
 
+#include <cstring>
 #include <fstream>
 #include <sstream>
 

@@ -5,6 +5,8 @@
 
 #include <tinyobjloader/tiny_obj_loader.h>
 
+#include <cstring>
+
 bool MeshData::loadModel(const std::string& filename,
                          Color color,
                          std::vector<Model*>& models,

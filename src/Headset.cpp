@@ -433,8 +433,7 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
   const XrInstance instance = context->getXrInstance();
 
   // Poll OpenXR events
-  XrEventDataBuffer buffer;
-  buffer.type = XR_TYPE_EVENT_DATA_BUFFER;
+  XrEventDataBuffer buffer{ XR_TYPE_EVENT_DATA_BUFFER };
   while (xrPollEvent(instance, &buffer) == XR_SUCCESS)
   {
     switch (buffer.type)
@@ -470,6 +469,8 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
       break;
     }
     }
+
+    buffer.type = XR_TYPE_EVENT_DATA_BUFFER;
   }
 
   if (sessionState != XR_SESSION_STATE_READY && sessionState != XR_SESSION_STATE_SYNCHRONIZED &&
