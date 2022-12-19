@@ -38,13 +38,17 @@ Renderer::Renderer(const Context* context,
   }
 
   // Create a descriptor pool
-  VkDescriptorPoolSize descriptorPoolSize;
-  descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  descriptorPoolSize.descriptorCount = 1u;
+  std::array<VkDescriptorPoolSize, 2u> descriptorPoolSizes;
+
+  descriptorPoolSizes.at(0u).type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+  descriptorPoolSizes.at(0u).descriptorCount = static_cast<uint32_t>(numFramesInFlight);
+
+  descriptorPoolSizes.at(1u).type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descriptorPoolSizes.at(1u).descriptorCount = static_cast<uint32_t>(numFramesInFlight * 2u);
 
   VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-  descriptorPoolCreateInfo.poolSizeCount = 1u;
-  descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+  descriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size());
+  descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
   descriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(numFramesInFlight);
   if (vkCreateDescriptorPool(vkDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)
   {
