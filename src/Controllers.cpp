@@ -6,18 +6,26 @@
 #include <glm/mat4x4.hpp>
 
 #include <array>
+#include <cstring>
 
 namespace
 {
 constexpr size_t numControllers = 2u;
-}
+
+const std::string actionSetName = "actionset";
+const std::string localizedActionSetName = "Actions";
+const std::string actionName = "handpose";
+const std::string localizedActionName = "Hand Pose";
+} // namespace
 
 Controllers::Controllers(XrInstance instance, XrSession session) : session(session)
 {
   // Create an action set
   XrActionSetCreateInfo actionSetCreateInfo{ XR_TYPE_ACTION_SET_CREATE_INFO };
-  strncpy_s(actionSetCreateInfo.actionSetName, "actionset", XR_MAX_ACTION_SET_NAME_SIZE);
-  strncpy_s(actionSetCreateInfo.localizedActionSetName, "Actions", XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE);
+
+  memcpy(actionSetCreateInfo.actionSetName, actionSetName.data(), actionSetName.length() + 1u);
+  memcpy(actionSetCreateInfo.localizedActionSetName, localizedActionSetName.data(),
+         localizedActionSetName.length() + 1u);
 
   XrResult result = xrCreateActionSet(instance, &actionSetCreateInfo, &actionSet);
   if (XR_FAILED(result))
@@ -38,8 +46,8 @@ Controllers::Controllers(XrInstance instance, XrSession session) : session(sessi
   actionCreateInfo.countSubactionPaths = static_cast<uint32_t>(paths.size());
   actionCreateInfo.subactionPaths = paths.data();
 
-  strncpy_s(actionCreateInfo.actionName, "handpose", XR_MAX_ACTION_NAME_SIZE);
-  strncpy_s(actionCreateInfo.localizedActionName, "Hand Pose", XR_MAX_LOCALIZED_ACTION_NAME_SIZE);
+  memcpy(actionCreateInfo.actionName, actionName.data(), actionName.length() + 1u);
+  memcpy(actionCreateInfo.localizedActionName, localizedActionName.data(), localizedActionName.length() + 1u);
 
   result = xrCreateAction(actionSet, &actionCreateInfo, &action);
   if (XR_FAILED(result))

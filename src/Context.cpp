@@ -4,6 +4,7 @@
 
 #include <glfw/glfw3.h>
 
+#include <cstring>
 #include <sstream>
 
 #ifdef DEBUG
@@ -15,6 +16,9 @@ namespace
 {
 constexpr XrViewConfigurationType viewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 constexpr XrEnvironmentBlendMode environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+
+const std::string applicationName = "OpenXR Vulkan Example";
+const std::string engineName = "OpenXR Vulkan Example";
 } // namespace
 
 Context::Context()
@@ -69,8 +73,9 @@ Context::Context()
     applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
     applicationInfo.applicationVersion = static_cast<uint32_t>(XR_MAKE_VERSION(0, 1, 0));
     applicationInfo.engineVersion = static_cast<uint32_t>(XR_MAKE_VERSION(0, 1, 0));
-    strncpy_s(applicationInfo.applicationName, "OpenXR Vulkan Example", XR_MAX_APPLICATION_NAME_SIZE);
-    strncpy_s(applicationInfo.engineName, "OpenXR Vulkan Example", XR_MAX_ENGINE_NAME_SIZE);
+
+    memcpy(applicationInfo.applicationName, applicationName.data(), applicationName.length() + 1u);
+    memcpy(applicationInfo.engineName, engineName.data(), engineName.length() + 1u);
 
     std::vector<const char*> extensions = { XR_KHR_VULKAN_ENABLE_EXTENSION_NAME };
 
