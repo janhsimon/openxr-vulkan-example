@@ -14,7 +14,7 @@
 
 namespace
 {
-constexpr size_t numFramesInFlight = 2u;
+constexpr size_t framesInFlightCount = 2u;
 } // namespace
 
 Renderer::Renderer(const Context* context,
@@ -24,13 +24,13 @@ Renderer::Renderer(const Context* context,
 : context(context), headset(headset), models(models)
 {
   const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
-  const VkDevice vkDevice = context->getVkDevice();
+  const VkDevice device = context->getVkDevice();
 
   // Create a command pool
   VkCommandPoolCreateInfo commandPoolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
   commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   commandPoolCreateInfo.queueFamilyIndex = context->getVkDrawQueueFamilyIndex();
-  if (vkCreateCommandPool(vkDevice, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
+  if (vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
   {
     util::error(Error::GenericVulkan);
     valid = false;
@@ -41,16 +41,16 @@ Renderer::Renderer(const Context* context,
   std::array<VkDescriptorPoolSize, 2u> descriptorPoolSizes;
 
   descriptorPoolSizes.at(0u).type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-  descriptorPoolSizes.at(0u).descriptorCount = static_cast<uint32_t>(numFramesInFlight);
+  descriptorPoolSizes.at(0u).descriptorCount = static_cast<uint32_t>(framesInFlightCount);
 
   descriptorPoolSizes.at(1u).type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  descriptorPoolSizes.at(1u).descriptorCount = static_cast<uint32_t>(numFramesInFlight * 2u);
+  descriptorPoolSizes.at(1u).descriptorCount = static_cast<uint32_t>(framesInFlightCount * 2u);
 
   VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
   descriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size());
   descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
-  descriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(numFramesInFlight);
-  if (vkCreateDescriptorPool(vkDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)
+  descriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(framesInFlightCount);
+  if (vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS)
   {
     util::error(Error::GenericVulkan);
     valid = false;
@@ -78,8 +78,7 @@ Renderer::Renderer(const Context* context,
   VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
   descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
   descriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings.data();
-  if (vkCreateDescriptorSetLayout(vkDevice, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) !=
-      VK_SUCCESS)
+  if (vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
   {
     util::error(Error::GenericVulkan);
     valid = false;
@@ -90,24 +89,18 @@ Renderer::Renderer(const Context* context,
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
   pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
   pipelineLayoutCreateInfo.setLayoutCount = 1u;
-  if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
+  if (vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
   {
     util::error(Error::GenericVulkan);
     valid = false;
     return;
   }
 
-  // Retrieve the physical device properties
-  VkPhysicalDeviceProperties physicalDeviceProperties;
-  vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
-  uniformBufferOffsetAlignment = physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
-
   // Create a render process for each frame in flight
-  renderProcesses.resize(numFramesInFlight);
+  renderProcesses.resize(framesInFlightCount);
   for (RenderProcess*& renderProcess : renderProcesses)
   {
-    renderProcess = new RenderProcess(vkDevice, vkPhysicalDevice, commandPool, descriptorPool, descriptorSetLayout,
-                                      models.size(), uniformBufferOffsetAlignment);
+    renderProcess = new RenderProcess(context, commandPool, descriptorPool, descriptorSetLayout, models.size());
     if (!renderProcess->isValid())
     {
       valid = false;
@@ -140,7 +133,7 @@ Renderer::Renderer(const Context* context,
   vertexInputAttributeColor.offset = offsetof(Vertex, color);
 
   gridPipeline =
-    new Pipeline(vkDevice, pipelineLayout, headset->getVkRenderPass(), "shaders/Grid.vert.spv", "shaders/Grid.frag.spv",
+    new Pipeline(context, pipelineLayout, headset->getVkRenderPass(), "shaders/Grid.vert.spv", "shaders/Grid.frag.spv",
                  { vertexInputBindingDescription }, { vertexInputAttributePosition, vertexInputAttributeColor });
   if (!gridPipeline->isValid())
   {
@@ -150,7 +143,7 @@ Renderer::Renderer(const Context* context,
 
   // Create the diffuse pipeline
   diffusePipeline =
-    new Pipeline(vkDevice, pipelineLayout, headset->getVkRenderPass(), "shaders/Diffuse.vert.spv",
+    new Pipeline(context, pipelineLayout, headset->getVkRenderPass(), "shaders/Diffuse.vert.spv",
                  "shaders/Diffuse.frag.spv", { vertexInputBindingDescription },
                  { vertexInputAttributePosition, vertexInputAttributeNormal, vertexInputAttributeColor });
   if (!diffusePipeline->isValid())
@@ -164,7 +157,7 @@ Renderer::Renderer(const Context* context,
     // Create a staging buffer
     const VkDeviceSize bufferSize = static_cast<VkDeviceSize>(meshData->getSize());
     Buffer* stagingBuffer =
-      new Buffer(vkDevice, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+      new Buffer(device, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize);
     if (!stagingBuffer->isValid())
     {
@@ -184,7 +177,7 @@ Renderer::Renderer(const Context* context,
     stagingBuffer->unmap();
 
     // Create an empty target buffer
-    vertexIndexBuffer = new Buffer(vkDevice, vkPhysicalDevice,
+    vertexIndexBuffer = new Buffer(device, vkPhysicalDevice,
                                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize);
@@ -215,22 +208,22 @@ Renderer::~Renderer()
   delete diffusePipeline;
   delete gridPipeline;
 
-  const VkDevice vkDevice = context->getVkDevice();
-  if (vkDevice)
+  const VkDevice device = context->getVkDevice();
+  if (device)
   {
     if (pipelineLayout)
     {
-      vkDestroyPipelineLayout(vkDevice, pipelineLayout, nullptr);
+      vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     }
 
     if (descriptorSetLayout)
     {
-      vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout, nullptr);
+      vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
     }
 
     if (descriptorPool)
     {
-      vkDestroyDescriptorPool(vkDevice, descriptorPool, nullptr);
+      vkDestroyDescriptorPool(device, descriptorPool, nullptr);
     }
   }
 
@@ -239,9 +232,9 @@ Renderer::~Renderer()
     delete renderProcess;
   }
 
-  if (vkDevice && commandPool)
+  if (device && commandPool)
   {
-    vkDestroyCommandPool(vkDevice, commandPool, nullptr);
+    vkDestroyCommandPool(device, commandPool, nullptr);
   }
 }
 
@@ -331,9 +324,9 @@ void Renderer::render(size_t swapchainImageIndex, float time)
     const Model* model = models.at(modelIndex);
 
     // Bind the uniform buffer
-    const uint32_t uniformBufferOffset =
-      static_cast<uint32_t>(util::align(sizeof(RenderProcess::DynamicVertexUniformData), uniformBufferOffsetAlignment) *
-                            static_cast<VkDeviceSize>(modelIndex));
+    const uint32_t uniformBufferOffset = static_cast<uint32_t>(
+      util::align(sizeof(RenderProcess::DynamicVertexUniformData), context->getUniformBufferOffsetAlignment()) *
+      static_cast<VkDeviceSize>(modelIndex));
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0u, 1u, &descriptorSet, 1u,
                             &uniformBufferOffset);
 
@@ -347,7 +340,7 @@ void Renderer::render(size_t swapchainImageIndex, float time)
       diffusePipeline->bind(commandBuffer);
     }
 
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(model->numIndices), 1u,
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(model->indexCount), 1u,
                      static_cast<uint32_t>(model->firstIndex), 0u, 0u);
   }
 
@@ -363,7 +356,7 @@ void Renderer::submit(bool useSemaphores) const
     return;
   }
 
-  const VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+  constexpr VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
   const VkSemaphore drawableSemaphore = renderProcess->getDrawableSemaphore();
   const VkSemaphore presentableSemaphore = renderProcess->getPresentableSemaphore();
   const VkFence busyFence = renderProcess->getBusyFence();

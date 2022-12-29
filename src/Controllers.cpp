@@ -10,7 +10,7 @@
 
 namespace
 {
-constexpr size_t numControllers = 2u;
+constexpr size_t controllerCount = 2u;
 
 const std::string actionSetName = "actionset";
 const std::string localizedActionSetName = "Actions";
@@ -36,7 +36,7 @@ Controllers::Controllers(XrInstance instance, XrSession session) : session(sessi
   }
 
   // Create paths
-  paths.resize(numControllers);
+  paths.resize(controllerCount);
   paths.at(0u) = util::stringToPath(instance, "/user/hand/left");
   paths.at(1u) = util::stringToPath(instance, "/user/hand/right");
 
@@ -57,8 +57,8 @@ Controllers::Controllers(XrInstance instance, XrSession session) : session(sessi
   }
 
   // Create spaces
-  spaces.resize(numControllers);
-  for (size_t controllerIndex = 0u; controllerIndex < numControllers; ++controllerIndex)
+  spaces.resize(controllerCount);
+  for (size_t controllerIndex = 0u; controllerIndex < controllerCount; ++controllerIndex)
   {
     const XrPath& path = paths.at(controllerIndex);
 
@@ -111,7 +111,7 @@ Controllers::Controllers(XrInstance instance, XrSession session) : session(sessi
     return;
   }
 
-  transforms.resize(numControllers);
+  transforms.resize(controllerCount);
 }
 
 bool Controllers::sync(XrSpace space, XrTime time)
@@ -133,7 +133,7 @@ bool Controllers::sync(XrSpace space, XrTime time)
   }
 
   // Update the transforms
-  for (size_t controllerIndex = 0u; controllerIndex < numControllers; ++controllerIndex)
+  for (size_t controllerIndex = 0u; controllerIndex < controllerCount; ++controllerIndex)
   {
     const XrPath& path = paths.at(controllerIndex);
 

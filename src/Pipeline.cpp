@@ -5,15 +5,17 @@
 #include <array>
 #include <sstream>
 
-Pipeline::Pipeline(VkDevice device,
+Pipeline::Pipeline(const Context* context,
                    VkPipelineLayout pipelineLayout,
                    VkRenderPass renderPass,
                    const std::string& vertexFilename,
                    const std::string& fragmentFilename,
                    const std::vector<VkVertexInputBindingDescription>& vertexInputBindingDescriptions,
                    const std::vector<VkVertexInputAttributeDescription>& vertexInputAttributeDescriptions)
-: device(device)
+: context(context)
 {
+  const VkDevice device = context->getVkDevice();
+
   // Load the vertex shader
   VkShaderModule vertexShaderModule;
   if (!util::loadShaderFromFile(device, vertexFilename, vertexShaderModule))
@@ -84,7 +86,7 @@ Pipeline::Pipeline(VkDevice device,
   VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo{
     VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO
   };
-  pipelineMultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  pipelineMultisampleStateCreateInfo.rasterizationSamples = context->getMultisampleCount();
 
   VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo{
     VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO
@@ -106,7 +108,7 @@ Pipeline::Pipeline(VkDevice device,
   VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{
     VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO
   };
-  const std::array dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+  constexpr std::array dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
   pipelineDynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
   pipelineDynamicStateCreateInfo.pDynamicStates = dynamicStates.data();
 
@@ -144,6 +146,7 @@ Pipeline::Pipeline(VkDevice device,
 
 Pipeline::~Pipeline()
 {
+  const VkDevice device = context->getVkDevice();
   if (device && pipeline)
   {
     vkDestroyPipeline(device, pipeline, nullptr);

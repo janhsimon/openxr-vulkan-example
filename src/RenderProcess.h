@@ -8,6 +8,7 @@
 #include <vector>
 
 class Buffer;
+class Context;
 
 /*
  * The render process class consolidates all the resources that needs to be duplicated for each frame that can be
@@ -19,13 +20,11 @@ class Buffer;
 class RenderProcess final
 {
 public:
-  RenderProcess(VkDevice device,
-                VkPhysicalDevice physicalDevice,
+  RenderProcess(const Context* context,
                 VkCommandPool commandPool,
                 VkDescriptorPool descriptorPool,
                 VkDescriptorSetLayout descriptorSetLayout,
-                size_t numModels,
-                VkDeviceSize uniformBufferOffsetAlignment);
+                size_t modelCount);
   ~RenderProcess();
 
   struct DynamicVertexUniformData
@@ -56,12 +55,11 @@ public:
 private:
   bool valid = true;
 
-  VkDevice device = nullptr;
+  const Context* context = nullptr;
   VkCommandBuffer commandBuffer = nullptr;
   VkSemaphore drawableSemaphore = nullptr, presentableSemaphore = nullptr;
   VkFence busyFence = nullptr;
   Buffer* uniformBuffer = nullptr;
   void* uniformBufferMemory = nullptr;
   VkDescriptorSet descriptorSet = nullptr;
-  VkDeviceSize uniformBufferOffsetAlignment = 0u;
 };

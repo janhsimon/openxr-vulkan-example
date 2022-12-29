@@ -61,7 +61,7 @@ bool MeshData::loadModel(const std::string& filename,
   {
     Model* model = models.at(modelIndex);
     model->firstIndex = oldIndexCount;
-    model->numIndices = indices.size() - oldIndexCount;
+    model->indexCount = indices.size() - oldIndexCount;
   }
 
   return true;

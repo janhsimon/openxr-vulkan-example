@@ -1,13 +1,13 @@
 #include "Headset.h"
 
 #include "Context.h"
+#include "ImageBuffer.h"
 #include "RenderTarget.h"
 #include "Util.h"
 
 #include <glm/mat4x4.hpp>
 
 #include <array>
-#include <sstream>
 
 namespace
 {
@@ -19,6 +19,7 @@ constexpr VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 Headset::Headset(const Context* context) : context(context)
 {
   const VkDevice device = context->getVkDevice();
+  const VkSampleCountFlagBits multisampleCount = context->getMultisampleCount();
 
   // Create a render pass
   {
@@ -35,7 +36,7 @@ Headset::Headset(const Context* context) : context(context)
 
     VkAttachmentDescription colorAttachmentDescription{};
     colorAttachmentDescription.format = colorFormat;
-    colorAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachmentDescription.samples = multisampleCount;
     colorAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -49,7 +50,7 @@ Headset::Headset(const Context* context) : context(context)
 
     VkAttachmentDescription depthAttachmentDescription{};
     depthAttachmentDescription.format = depthFormat;
-    depthAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachmentDescription.samples = multisampleCount;
     depthAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -61,13 +62,29 @@ Headset::Headset(const Context* context) : context(context)
     depthAttachmentReference.attachment = 1u;
     depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription resolveAttachmentDescription{};
+    resolveAttachmentDescription.format = colorFormat;
+    resolveAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+    resolveAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    resolveAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    resolveAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    resolveAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    resolveAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    resolveAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference resolveAttachmentReference;
+    resolveAttachmentReference.attachment = 2u;
+    resolveAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpassDescription{};
     subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpassDescription.colorAttachmentCount = 1u;
     subpassDescription.pColorAttachments = &colorAttachmentReference;
     subpassDescription.pDepthStencilAttachment = &depthAttachmentReference;
+    subpassDescription.pResolveAttachments = &resolveAttachmentReference;
 
-    const std::array attachments = { colorAttachmentDescription, depthAttachmentDescription };
+    const std::array attachments = { colorAttachmentDescription, depthAttachmentDescription,
+                                     resolveAttachmentDescription };
 
     VkRenderPassCreateInfo renderPassCreateInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
     renderPassCreateInfo.pNext = &renderPassMultiviewCreateInfo;
@@ -197,94 +214,22 @@ Headset::Headset(const Context* context) : context(context)
 
   const VkExtent2D eyeResolution = getEyeResolution(0u);
 
-  // Create a depth buffer
+  // Create a color buffer
+  colorBuffer = new ImageBuffer(context, eyeResolution, colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                context->getMultisampleCount(), VK_IMAGE_ASPECT_COLOR_BIT, 2u);
+  if (!colorBuffer->isValid())
   {
-    // Create an image
-    VkImageCreateInfo imageCreateInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageCreateInfo.extent.width = eyeResolution.width;
-    imageCreateInfo.extent.height = eyeResolution.height;
-    imageCreateInfo.extent.depth = 1u;
-    imageCreateInfo.mipLevels = 1u;
-    imageCreateInfo.arrayLayers = 2u;
-    imageCreateInfo.format = depthFormat;
-    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vkCreateImage(device, &imageCreateInfo, nullptr, &depthImage) != VK_SUCCESS)
-    {
-      util::error(Error::GenericVulkan);
-      valid = false;
-      return;
-    }
+    valid = false;
+    return;
+  }
 
-    VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(device, depthImage, &memoryRequirements);
-
-    VkPhysicalDeviceMemoryProperties supportedMemoryProperties;
-    vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &supportedMemoryProperties);
-
-    const VkMemoryPropertyFlags memoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    const VkMemoryPropertyFlags typeFilter = memoryRequirements.memoryTypeBits;
-    uint32_t suitableMemoryTypeIndex = 0u;
-    bool memoryTypeFound = false;
-    for (uint32_t memoryTypeIndex = 0u; memoryTypeIndex < supportedMemoryProperties.memoryTypeCount; ++memoryTypeIndex)
-    {
-      const VkMemoryPropertyFlags propertyFlags = supportedMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
-      if (typeFilter & (1 << memoryTypeIndex) && (propertyFlags & memoryProperties) == memoryProperties)
-      {
-        suitableMemoryTypeIndex = memoryTypeIndex;
-        memoryTypeFound = true;
-        break;
-      }
-    }
-
-    if (!memoryTypeFound)
-    {
-      util::error(Error::FeatureNotSupported, "Suitable depth buffer memory type");
-      valid = false;
-      return;
-    }
-
-    VkMemoryAllocateInfo memoryAllocateInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    memoryAllocateInfo.allocationSize = memoryRequirements.size;
-    memoryAllocateInfo.memoryTypeIndex = suitableMemoryTypeIndex;
-    if (vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &depthMemory) != VK_SUCCESS)
-    {
-      std::stringstream s;
-      s << memoryRequirements.size << " bytes for depth buffer";
-      util::error(Error::OutOfMemory, s.str());
-      valid = false;
-      return;
-    }
-
-    if (vkBindImageMemory(device, depthImage, depthMemory, 0) != VK_SUCCESS)
-    {
-      util::error(Error::GenericVulkan);
-      valid = false;
-      return;
-    }
-
-    // Create an image view
-    VkImageViewCreateInfo imageViewCreateInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-    imageViewCreateInfo.image = depthImage;
-    imageViewCreateInfo.format = depthFormat;
-    imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-    imageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-                                       VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
-    imageViewCreateInfo.subresourceRange.layerCount = 2u;
-    imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    imageViewCreateInfo.subresourceRange.baseArrayLayer = 0u;
-    imageViewCreateInfo.subresourceRange.baseMipLevel = 0u;
-    imageViewCreateInfo.subresourceRange.levelCount = 1u;
-    if (vkCreateImageView(device, &imageViewCreateInfo, nullptr, &depthImageView) != VK_SUCCESS)
-    {
-      util::error(Error::GenericVulkan);
-      valid = false;
-      return;
-    }
+  // Create a depth buffer
+  depthBuffer = new ImageBuffer(context, eyeResolution, depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                                context->getMultisampleCount(), VK_IMAGE_ASPECT_DEPTH_BIT, 2u);
+  if (!depthBuffer->isValid())
+  {
+    valid = false;
+    return;
   }
 
   // Create a swapchain and render targets
@@ -344,7 +289,8 @@ Headset::Headset(const Context* context) : context(context)
       RenderTarget*& renderTarget = swapchainRenderTargets.at(renderTargetIndex);
 
       const VkImage image = swapchainImages.at(renderTargetIndex).image;
-      renderTarget = new RenderTarget(device, image, depthImageView, eyeResolution, colorFormat, renderPass, 2u);
+      renderTarget = new RenderTarget(device, image, colorBuffer->getImageView(), depthBuffer->getImageView(),
+                                      eyeResolution, colorFormat, renderPass, 2u);
       if (!renderTarget->isValid())
       {
         valid = false;
@@ -404,27 +350,20 @@ Headset::~Headset()
   }
 
   // Clean up Vulkan
-  if (const VkDevice vkDevice = context->getVkDevice())
+  if (depthBuffer)
   {
-    if (depthImageView)
-    {
-      vkDestroyImageView(vkDevice, depthImageView, nullptr);
-    }
+    delete depthBuffer;
+  }
 
-    if (depthMemory)
-    {
-      vkFreeMemory(vkDevice, depthMemory, nullptr);
-    }
+  if (colorBuffer)
+  {
+    delete colorBuffer;
+  }
 
-    if (depthImage)
-    {
-      vkDestroyImage(vkDevice, depthImage, nullptr);
-    }
-
-    if (renderPass)
-    {
-      vkDestroyRenderPass(vkDevice, renderPass, nullptr);
-    }
+  const VkDevice vkDevice = context->getVkDevice();
+  if (vkDevice && renderPass)
+  {
+    vkDestroyRenderPass(vkDevice, renderPass, nullptr);
   }
 }
 

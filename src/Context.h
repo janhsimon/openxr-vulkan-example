@@ -33,6 +33,9 @@ public:
   VkQueue getVkDrawQueue() const;
   VkQueue getVkPresentQueue() const;
 
+  VkDeviceSize getUniformBufferOffsetAlignment() const;
+  VkSampleCountFlagBits getMultisampleCount() const;
+
 private:
   bool valid = true;
 
@@ -50,6 +53,8 @@ private:
   uint32_t drawQueueFamilyIndex = 0u, presentQueueFamilyIndex = 0u;
   VkDevice device = nullptr;
   VkQueue drawQueue = nullptr, presentQueue = nullptr;
+  VkDeviceSize uniformBufferOffsetAlignment = 0u;
+  VkSampleCountFlagBits multisampleCount = VK_SAMPLE_COUNT_1_BIT;
 
 #ifdef DEBUG
   PFN_xrCreateDebugUtilsMessengerEXT xrCreateDebugUtilsMessengerEXT = nullptr;

@@ -10,6 +10,6 @@
 struct Model final
 {
   size_t firstIndex = 0u;
-  size_t numIndices = 0u;
+  size_t indexCount = 0u;
   glm::mat4 worldMatrix;
 };

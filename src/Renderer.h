@@ -48,5 +48,4 @@ private:
   std::vector<Model*> models;
   size_t indexOffset = 0u;
   size_t currentRenderProcessIndex = 0u;
-  VkDeviceSize uniformBufferOffsetAlignment = 0u;
 };

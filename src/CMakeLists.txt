@@ -23,6 +23,9 @@ set(SRC
   Headset.cpp
   Headset.h
 
+  ImageBuffer.cpp
+  ImageBuffer.h
+
   MeshData.cpp
   MeshData.h
 

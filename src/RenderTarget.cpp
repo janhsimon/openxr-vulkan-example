@@ -2,8 +2,11 @@
 
 #include "Util.h"
 
+#include <array>
+
 RenderTarget::RenderTarget(VkDevice device,
                            VkImage image,
+                           VkImageView colorImageView,
                            VkImageView depthImageView,
                            VkExtent2D size,
                            VkFormat format,
@@ -30,11 +33,7 @@ RenderTarget::RenderTarget(VkDevice device,
     return;
   }
 
-  std::vector<VkImageView> attachments = { imageView };
-  if (depthImageView)
-  {
-    attachments.push_back(depthImageView);
-  }
+  const std::array attachments = { colorImageView, depthImageView, imageView };
 
   // Create a framebuffer
   VkFramebufferCreateInfo framebufferCreateInfo{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };

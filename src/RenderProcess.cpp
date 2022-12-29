@@ -1,22 +1,21 @@
 #include "RenderProcess.h"
 
 #include "Buffer.h"
+#include "Context.h"
 #include "Util.h"
 
 #include <cstring>
 
-RenderProcess::RenderProcess(VkDevice device,
-                             VkPhysicalDevice physicalDevice,
+RenderProcess::RenderProcess(const Context* context,
                              VkCommandPool commandPool,
                              VkDescriptorPool descriptorPool,
                              VkDescriptorSetLayout descriptorSetLayout,
-                             size_t numModels,
-                             VkDeviceSize uniformBufferOffsetAlignment)
-: device(device), uniformBufferOffsetAlignment(uniformBufferOffsetAlignment)
+                             size_t modelCount)
+: context(context)
 {
   // Initialize the uniform buffer data
-  dynamicVertexUniformData.resize(numModels);
-  for (size_t modelIndex = 0u; modelIndex < numModels; ++modelIndex)
+  dynamicVertexUniformData.resize(modelCount);
+  for (size_t modelIndex = 0u; modelIndex < modelCount; ++modelIndex)
   {
     dynamicVertexUniformData.at(modelIndex).worldMatrix = glm::mat4(1.0f);
   }
@@ -27,6 +26,8 @@ RenderProcess::RenderProcess(VkDevice device,
   }
 
   staticFragmentUniformData.time = 0.0f;
+
+  const VkDevice device = context->getVkDevice();
 
   // Allocate a command buffer
   VkCommandBufferAllocateInfo commandBufferAllocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
@@ -66,6 +67,8 @@ RenderProcess::RenderProcess(VkDevice device,
     return;
   }
 
+  const VkDeviceSize uniformBufferOffsetAlignment = context->getUniformBufferOffsetAlignment();
+
   // Partition the uniform buffer data
   std::array<VkDescriptorBufferInfo, 3u> descriptorBufferInfos;
 
@@ -73,7 +76,7 @@ RenderProcess::RenderProcess(VkDevice device,
   descriptorBufferInfos.at(0u).range = sizeof(DynamicVertexUniformData);
 
   descriptorBufferInfos.at(1u).offset = util::align(descriptorBufferInfos.at(0u).range, uniformBufferOffsetAlignment) *
-                                        static_cast<VkDeviceSize>(numModels);
+                                        static_cast<VkDeviceSize>(modelCount);
   descriptorBufferInfos.at(1u).range = sizeof(StaticVertexUniformData);
 
   descriptorBufferInfos.at(2u).offset =
@@ -83,7 +86,7 @@ RenderProcess::RenderProcess(VkDevice device,
   // Create an empty uniform buffer
   const VkDeviceSize uniformBufferSize = descriptorBufferInfos.at(2u).offset + descriptorBufferInfos.at(2u).range;
   uniformBuffer =
-    new Buffer(device, physicalDevice, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    new Buffer(device, context->getVkPhysicalDevice(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBufferSize);
   if (!uniformBuffer->isValid())
   {
@@ -166,6 +169,7 @@ RenderProcess::~RenderProcess()
   }
   delete uniformBuffer;
 
+  const VkDevice device = context->getVkDevice();
   if (device)
   {
     if (busyFence)
@@ -221,6 +225,8 @@ void RenderProcess::updateUniformBufferData() const
   {
     return;
   }
+
+  const VkDeviceSize uniformBufferOffsetAlignment = context->getUniformBufferOffsetAlignment();
 
   char* offset = static_cast<char*>(uniformBufferMemory);
   VkDeviceSize length = sizeof(DynamicVertexUniformData);

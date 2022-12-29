@@ -679,6 +679,23 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 
   // Create a device
   {
+    // Retrieve the physical device properties
+    VkPhysicalDeviceProperties physicalDeviceProperties;
+    vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
+    uniformBufferOffsetAlignment = physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
+
+    // Determine the best supported multisample count, up to 4x MSAA
+    const VkSampleCountFlags sampleCountFlags = physicalDeviceProperties.limits.framebufferColorSampleCounts &
+                                                physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+    if (sampleCountFlags & VK_SAMPLE_COUNT_4_BIT)
+    {
+      multisampleCount = VK_SAMPLE_COUNT_4_BIT;
+    }
+    else if (sampleCountFlags & VK_SAMPLE_COUNT_2_BIT)
+    {
+      multisampleCount = VK_SAMPLE_COUNT_2_BIT;
+    }
+
     // Verify that the required physical device features are supported
     VkPhysicalDeviceFeatures physicalDeviceFeatures;
     vkGetPhysicalDeviceFeatures(physicalDevice, &physicalDeviceFeatures);
@@ -813,4 +830,14 @@ VkQueue Context::getVkDrawQueue() const
 VkQueue Context::getVkPresentQueue() const
 {
   return presentQueue;
+}
+
+VkDeviceSize Context::getUniformBufferOffsetAlignment() const
+{
+  return uniformBufferOffsetAlignment;
+}
+
+VkSampleCountFlagBits Context::getMultisampleCount() const
+{
+  return multisampleCount;
 }

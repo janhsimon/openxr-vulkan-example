@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
+#include "Context.h"
 
 #include <string>
 #include <vector>
@@ -12,7 +12,7 @@
 class Pipeline final
 {
 public:
-  Pipeline(VkDevice device,
+  Pipeline(const Context* context,
            VkPipelineLayout pipelineLayout,
            VkRenderPass renderPass,
            const std::string& vertexFilename,
@@ -28,6 +28,6 @@ public:
 private:
   bool valid = true;
 
-  VkDevice device = nullptr;
+  const Context* context = nullptr;
   VkPipeline pipeline = nullptr;
 };

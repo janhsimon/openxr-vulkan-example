@@ -9,6 +9,7 @@
 #include <vector>
 
 class Context;
+class ImageBuffer;
 class RenderTarget;
 
 /*
@@ -74,10 +75,7 @@ private:
 
   VkRenderPass renderPass = nullptr;
 
-  // Depth buffer
-  VkImage depthImage = nullptr;
-  VkDeviceMemory depthMemory = nullptr;
-  VkImageView depthImageView = nullptr;
+  ImageBuffer *colorBuffer = nullptr, *depthBuffer = nullptr;
 
   bool beginSession() const;
   bool endSession() const;
