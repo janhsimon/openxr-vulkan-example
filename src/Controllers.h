@@ -15,6 +15,7 @@ class Controllers final
 {
 public:
   Controllers(XrInstance instance, XrSession session);
+  ~Controllers();
 
   bool sync(XrSpace space, XrTime time);
 

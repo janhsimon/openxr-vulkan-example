@@ -114,6 +114,18 @@ Controllers::Controllers(XrInstance instance, XrSession session) : session(sessi
   transforms.resize(controllerCount);
 }
 
+Controllers::~Controllers()
+{
+  for (const XrSpace& space : spaces)
+  {
+    xrDestroySpace(space);
+  }
+
+  xrDestroyAction(action);
+
+  xrDestroyActionSet(actionSet);
+}
+
 bool Controllers::sync(XrSpace space, XrTime time)
 {
   // Sync the actions
