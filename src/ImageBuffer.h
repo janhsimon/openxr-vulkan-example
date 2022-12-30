@@ -26,8 +26,7 @@ private:
   bool valid = true;
 
   const Context* context = nullptr;
-
   VkImage image = nullptr;
-  VkDeviceMemory memory = nullptr;
+  VkDeviceMemory deviceMemory = nullptr;
   VkImageView imageView = nullptr;
 };

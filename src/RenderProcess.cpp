@@ -1,7 +1,7 @@
 #include "RenderProcess.h"
 
-#include "Buffer.h"
 #include "Context.h"
+#include "DataBuffer.h"
 #include "Util.h"
 
 #include <cstring>
@@ -86,8 +86,8 @@ RenderProcess::RenderProcess(const Context* context,
   // Create an empty uniform buffer
   const VkDeviceSize uniformBufferSize = descriptorBufferInfos.at(2u).offset + descriptorBufferInfos.at(2u).range;
   uniformBuffer =
-    new Buffer(device, context->getVkPhysicalDevice(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBufferSize);
+    new DataBuffer(context, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBufferSize);
   if (!uniformBuffer->isValid())
   {
     valid = false;
@@ -118,7 +118,7 @@ RenderProcess::RenderProcess(const Context* context,
   // Associate the uniform buffer with each descriptor buffer info
   for (VkDescriptorBufferInfo& descriptorBufferInfo : descriptorBufferInfos)
   {
-    descriptorBufferInfo.buffer = uniformBuffer->getVkBuffer();
+    descriptorBufferInfo.buffer = uniformBuffer->getBuffer();
   }
 
   // Update the descriptor sets

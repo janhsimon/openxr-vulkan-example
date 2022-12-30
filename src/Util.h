@@ -44,6 +44,11 @@ std::vector<const char*> unpackExtensionString(const std::string& string);
 // Loads a shader from 'file' into 'shaderModule', returns false on error
 bool loadShaderFromFile(VkDevice device, const std::string& filename, VkShaderModule& shaderModule);
 
+// Finds a suitable memory type index for given requirements and properties, returns false on error
+bool findSuitableMemoryTypeIndex(VkPhysicalDevice physicalDevice,
+                                 VkMemoryRequirements requirements,
+                                 VkMemoryPropertyFlags properties,
+                                 uint32_t& typeIndex);
 // Aligns a value to an alignment
 size_t align(size_t value, VkDeviceSize alignment);
 

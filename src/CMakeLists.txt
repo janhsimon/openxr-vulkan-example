@@ -10,15 +10,15 @@ set(SHADER_SRC
 
 set(SRC
   Main.cpp
-  
-  Buffer.cpp
-  Buffer.h
 
   Context.cpp
   Context.h
 
   Controllers.cpp
   Controllers.h
+
+  DataBuffer.cpp
+  DataBuffer.h
 
   Headset.cpp
   Headset.h

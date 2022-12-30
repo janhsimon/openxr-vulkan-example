@@ -118,6 +118,28 @@ bool util::loadShaderFromFile(VkDevice device, const std::string& filename, VkSh
   return true;
 }
 
+bool util::findSuitableMemoryTypeIndex(VkPhysicalDevice physicalDevice,
+                                       VkMemoryRequirements requirements,
+                                       VkMemoryPropertyFlags properties,
+                                       uint32_t& typeIndex)
+{
+  VkPhysicalDeviceMemoryProperties supportedMemoryProperties;
+  vkGetPhysicalDeviceMemoryProperties(physicalDevice, &supportedMemoryProperties);
+
+  const VkMemoryPropertyFlags typeFilter = requirements.memoryTypeBits;
+  for (uint32_t memoryTypeIndex = 0u; memoryTypeIndex < supportedMemoryProperties.memoryTypeCount; ++memoryTypeIndex)
+  {
+    const VkMemoryPropertyFlags propertyFlags = supportedMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+    if (typeFilter & (1u << memoryTypeIndex) && (propertyFlags & properties) == properties)
+    {
+      typeIndex = memoryTypeIndex;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 VkDeviceSize util::align(VkDeviceSize value, VkDeviceSize alignment)
 {
   if (value == 0u)

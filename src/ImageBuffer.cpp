@@ -36,38 +36,24 @@ ImageBuffer::ImageBuffer(const Context* context,
     return;
   }
 
+  // Find a suitable memory type index
   VkMemoryRequirements memoryRequirements;
   vkGetImageMemoryRequirements(device, image, &memoryRequirements);
 
-  VkPhysicalDeviceMemoryProperties supportedMemoryProperties;
-  vkGetPhysicalDeviceMemoryProperties(context->getVkPhysicalDevice(), &supportedMemoryProperties);
-
-  const VkMemoryPropertyFlags memoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-  const VkMemoryPropertyFlags typeFilter = memoryRequirements.memoryTypeBits;
   uint32_t suitableMemoryTypeIndex = 0u;
-  bool memoryTypeFound = false;
-  for (uint32_t memoryTypeIndex = 0u; memoryTypeIndex < supportedMemoryProperties.memoryTypeCount; ++memoryTypeIndex)
-  {
-    const VkMemoryPropertyFlags propertyFlags = supportedMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
-    if (typeFilter & (1 << memoryTypeIndex) && (propertyFlags & memoryProperties) == memoryProperties)
-    {
-      suitableMemoryTypeIndex = memoryTypeIndex;
-      memoryTypeFound = true;
-      break;
-    }
-  }
-
-  if (!memoryTypeFound)
+  if (!util::findSuitableMemoryTypeIndex(context->getVkPhysicalDevice(), memoryRequirements,
+                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, suitableMemoryTypeIndex))
   {
     util::error(Error::FeatureNotSupported, "Suitable image buffer memory type");
     valid = false;
     return;
   }
 
+  // Allocate the device memory for the buffer
   VkMemoryAllocateInfo memoryAllocateInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
   memoryAllocateInfo.allocationSize = memoryRequirements.size;
   memoryAllocateInfo.memoryTypeIndex = suitableMemoryTypeIndex;
-  if (vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &memory) != VK_SUCCESS)
+  if (vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &deviceMemory) != VK_SUCCESS)
   {
     std::stringstream s;
     s << memoryRequirements.size << " bytes for image buffer";
@@ -76,7 +62,8 @@ ImageBuffer::ImageBuffer(const Context* context,
     return;
   }
 
-  if (vkBindImageMemory(device, image, memory, 0u) != VK_SUCCESS)
+  // Bind the image to the allocated device memory
+  if (vkBindImageMemory(device, image, deviceMemory, 0u) != VK_SUCCESS)
   {
     util::error(Error::GenericVulkan);
     valid = false;
@@ -113,9 +100,9 @@ ImageBuffer::~ImageBuffer()
       vkDestroyImageView(device, imageView, nullptr);
     }
 
-    if (memory)
+    if (deviceMemory)
     {
-      vkFreeMemory(device, memory, nullptr);
+      vkFreeMemory(device, deviceMemory, nullptr);
     }
 
     if (image)

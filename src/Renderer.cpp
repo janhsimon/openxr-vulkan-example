@@ -1,7 +1,7 @@
 #include "Renderer.h"
 
-#include "Buffer.h"
 #include "Context.h"
+#include "DataBuffer.h"
 #include "Headset.h"
 #include "MeshData.h"
 #include "Model.h"
@@ -156,9 +156,9 @@ Renderer::Renderer(const Context* context,
   {
     // Create a staging buffer
     const VkDeviceSize bufferSize = static_cast<VkDeviceSize>(meshData->getSize());
-    Buffer* stagingBuffer =
-      new Buffer(device, vkPhysicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize);
+    DataBuffer* stagingBuffer =
+      new DataBuffer(context, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize);
     if (!stagingBuffer->isValid())
     {
       valid = false;
@@ -177,10 +177,10 @@ Renderer::Renderer(const Context* context,
     stagingBuffer->unmap();
 
     // Create an empty target buffer
-    vertexIndexBuffer = new Buffer(device, vkPhysicalDevice,
-                                   VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize);
+    vertexIndexBuffer = new DataBuffer(context,
+                                       VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                                         VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize);
     if (!vertexIndexBuffer->isValid())
     {
       valid = false;
@@ -311,7 +311,7 @@ void Renderer::render(size_t swapchainImageIndex, float time)
 
   // Bind the vertex section of the geometry buffer
   VkDeviceSize vertexOffset = 0u;
-  const VkBuffer buffer = vertexIndexBuffer->getVkBuffer();
+  const VkBuffer buffer = vertexIndexBuffer->getBuffer();
   vkCmdBindVertexBuffers(commandBuffer, 0u, 1u, &buffer, &vertexOffset);
 
   // Bind the index section of the geometry buffer

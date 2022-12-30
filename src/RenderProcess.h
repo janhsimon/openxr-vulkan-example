@@ -7,8 +7,8 @@
 #include <array>
 #include <vector>
 
-class Buffer;
 class Context;
+class DataBuffer;
 
 /*
  * The render process class consolidates all the resources that needs to be duplicated for each frame that can be
@@ -59,7 +59,7 @@ private:
   VkCommandBuffer commandBuffer = nullptr;
   VkSemaphore drawableSemaphore = nullptr, presentableSemaphore = nullptr;
   VkFence busyFence = nullptr;
-  Buffer* uniformBuffer = nullptr;
+  DataBuffer* uniformBuffer = nullptr;
   void* uniformBufferMemory = nullptr;
   VkDescriptorSet descriptorSet = nullptr;
 };

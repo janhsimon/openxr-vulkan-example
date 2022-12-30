@@ -1,16 +1,18 @@
-#include "Buffer.h"
+#include "DataBuffer.h"
 
+#include "Context.h"
 #include "Util.h"
 
 #include <sstream>
 
-Buffer::Buffer(const VkDevice device,
-               const VkPhysicalDevice physicalDevice,
-               const VkBufferUsageFlags bufferUsageFlags,
-               const VkMemoryPropertyFlags memoryProperties,
-               const VkDeviceSize size)
-: device(device), size(size)
+DataBuffer::DataBuffer(const Context* context,
+                       const VkBufferUsageFlags bufferUsageFlags,
+                       const VkMemoryPropertyFlags memoryProperties,
+                       const VkDeviceSize size)
+: context(context), size(size)
 {
+  const VkDevice device = context->getVkDevice();
+
   VkBufferCreateInfo bufferCreateInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
   bufferCreateInfo.size = size;
   bufferCreateInfo.usage = bufferUsageFlags;
@@ -25,28 +27,12 @@ Buffer::Buffer(const VkDevice device,
   VkMemoryRequirements memoryRequirements;
   vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
 
-  VkPhysicalDeviceMemoryProperties supportedMemoryProperties;
-  vkGetPhysicalDeviceMemoryProperties(physicalDevice, &supportedMemoryProperties);
-
-  const VkMemoryPropertyFlags typeFilter = memoryRequirements.memoryTypeBits;
   uint32_t suitableMemoryTypeIndex = 0u;
-  bool memoryTypeFound = false;
-  for (uint32_t memoryTypeIndex = 0u; memoryTypeIndex < supportedMemoryProperties.memoryTypeCount; ++memoryTypeIndex)
+  if (!util::findSuitableMemoryTypeIndex(context->getVkPhysicalDevice(), memoryRequirements, memoryProperties,
+                                         suitableMemoryTypeIndex))
   {
-    const VkMemoryPropertyFlags propertyFlags = supportedMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
-    if (typeFilter & (1 << memoryTypeIndex) && (propertyFlags & memoryProperties) == memoryProperties)
-    {
-      suitableMemoryTypeIndex = memoryTypeIndex;
-      memoryTypeFound = true;
-      break;
-    }
-  }
-
-  if (!memoryTypeFound)
-  {
-    util::error(Error::FeatureNotSupported, "Suitable buffer memory type");
+    util::error(Error::FeatureNotSupported, "Suitable data buffer memory type");
     valid = false;
-    return;
   }
 
   VkMemoryAllocateInfo memoryAllocateInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
@@ -69,8 +55,9 @@ Buffer::Buffer(const VkDevice device,
   }
 }
 
-Buffer::~Buffer()
+DataBuffer::~DataBuffer()
 {
+  const VkDevice device = context->getVkDevice();
   if (device)
   {
     if (deviceMemory)
@@ -85,7 +72,7 @@ Buffer::~Buffer()
   }
 }
 
-bool Buffer::copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue queue) const
+bool DataBuffer::copyTo(const DataBuffer& target, VkCommandBuffer commandBuffer, VkQueue queue) const
 {
   VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -97,7 +84,7 @@ bool Buffer::copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue
 
   VkBufferCopy copyRegion{};
   copyRegion.size = size;
-  vkCmdCopyBuffer(commandBuffer, buffer, target.getVkBuffer(), 1u, &copyRegion);
+  vkCmdCopyBuffer(commandBuffer, buffer, target.getBuffer(), 1u, &copyRegion);
 
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
   {
@@ -123,10 +110,10 @@ bool Buffer::copyTo(const Buffer& target, VkCommandBuffer commandBuffer, VkQueue
   return true;
 }
 
-void* Buffer::map() const
+void* DataBuffer::map() const
 {
   void* data;
-  VkResult result = vkMapMemory(device, deviceMemory, 0u, size, 0, &data);
+  const VkResult result = vkMapMemory(context->getVkDevice(), deviceMemory, 0u, size, 0, &data);
   if (result != VK_SUCCESS)
   {
     util::error(Error::GenericVulkan);
@@ -136,17 +123,17 @@ void* Buffer::map() const
   return data;
 }
 
-void Buffer::unmap() const
+void DataBuffer::unmap() const
 {
-  vkUnmapMemory(device, deviceMemory);
+  vkUnmapMemory(context->getVkDevice(), deviceMemory);
 }
 
-bool Buffer::isValid() const
+bool DataBuffer::isValid() const
 {
   return valid;
 }
 
-VkBuffer Buffer::getVkBuffer() const
+VkBuffer DataBuffer::getBuffer() const
 {
   return buffer;
 }

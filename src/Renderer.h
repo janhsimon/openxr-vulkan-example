@@ -4,8 +4,8 @@
 
 #include <vector>
 
-class Buffer;
 class Context;
+class DataBuffer;
 class Headset;
 class MeshData;
 struct Model;
@@ -44,7 +44,7 @@ private:
   std::vector<RenderProcess*> renderProcesses;
   VkPipelineLayout pipelineLayout = nullptr;
   Pipeline *gridPipeline = nullptr, *diffusePipeline = nullptr;
-  Buffer* vertexIndexBuffer = nullptr;
+  DataBuffer* vertexIndexBuffer = nullptr;
   std::vector<Model*> models;
   size_t indexOffset = 0u;
   size_t currentRenderProcessIndex = 0u;
