@@ -38,29 +38,43 @@ bool loadXrExtensionFunction(XrInstance instance, const std::string& name, PFN_x
 // Loads a Vulkan extension function by 'name', returns nullptr on error
 PFN_vkVoidFunction loadVkExtensionFunction(VkInstance instance, const std::string& name);
 
-// Unpacks an extension list in a single string into a vector of c-style strings
+// Unpacks a Vulkan or OpenXR extension list in a single string into a vector of c-style strings
 std::vector<const char*> unpackExtensionString(const std::string& string);
 
-// Loads a shader from 'file' into 'shaderModule', returns false on error
+// Loads a Vulkan shader from 'file' into 'shaderModule', returns false on error
 bool loadShaderFromFile(VkDevice device, const std::string& filename, VkShaderModule& shaderModule);
 
-// Finds a suitable memory type index for given requirements and properties, returns false on error
+// Finds a suitable Vulkan memory type index for given requirements and properties, returns false on error
 bool findSuitableMemoryTypeIndex(VkPhysicalDevice physicalDevice,
                                  VkMemoryRequirements requirements,
                                  VkMemoryPropertyFlags properties,
                                  uint32_t& typeIndex);
 // Aligns a value to an alignment
-size_t align(size_t value, VkDeviceSize alignment);
+VkDeviceSize align(VkDeviceSize value, VkDeviceSize alignment);
 
-// Creates a path from a name string
+// Creates an OpenXR path from a name string
 XrPath stringToPath(XrInstance instance, const std::string& string);
 
-// Creates an identity pose
+// Creates an OpenXR action with a given names, returns false on error
+bool createAction(XrActionSet actionSet,
+                  const std::vector<XrPath>& paths,
+                  const std::string& actionName,
+                  const std::string& localizedActionName,
+                  XrActionType type,
+                  XrAction& action);
+
+// Creates an OpenXR identity pose
 XrPosef makeIdentity();
 
-// Converts a pose to a transformation matrix
+// Converts an OpenXR pose to a transformation matrix
 glm::mat4 poseToMatrix(const XrPosef& pose);
 
-// Creates a projection matrix
+// Creates an OpenXR projection matrix
 glm::mat4 createProjectionMatrix(XrFovf fov, float nearClip, float farClip);
+
+// Updates an action state for a given action and path in pose format, returns false on error
+bool updateActionStatePose(XrSession session, XrAction action, XrPath path, XrActionStatePose& state);
+
+// Updates an action state for a given action and path in float format, returns false on error
+bool updateActionStateFloat(XrSession session, XrAction action, XrPath path, XrActionStateFloat& state);
 } // namespace util

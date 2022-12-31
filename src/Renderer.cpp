@@ -23,7 +23,6 @@ Renderer::Renderer(const Context* context,
                    const std::vector<Model*>& models)
 : context(context), headset(headset), models(models)
 {
-  const VkPhysicalDevice vkPhysicalDevice = context->getVkPhysicalDevice();
   const VkDevice device = context->getVkDevice();
 
   // Create a command pool
@@ -238,7 +237,7 @@ Renderer::~Renderer()
   }
 }
 
-void Renderer::render(size_t swapchainImageIndex, float time)
+void Renderer::render(const glm::mat4& cameraMatrix, size_t swapchainImageIndex, float time)
 {
   currentRenderProcessIndex = (currentRenderProcessIndex + 1u) % renderProcesses.size();
 
@@ -273,7 +272,7 @@ void Renderer::render(size_t swapchainImageIndex, float time)
     for (size_t eyeIndex = 0u; eyeIndex < headset->getEyeCount(); ++eyeIndex)
     {
       renderProcess->staticVertexUniformData.viewProjectionMatrices.at(eyeIndex) =
-        headset->getEyeProjectionMatrix(eyeIndex) * headset->getEyeViewMatrix(eyeIndex);
+        headset->getEyeProjectionMatrix(eyeIndex) * headset->getEyeViewMatrix(eyeIndex) * cameraMatrix;
     }
 
     renderProcess->staticFragmentUniformData.time = time;
@@ -324,9 +323,10 @@ void Renderer::render(size_t swapchainImageIndex, float time)
     const Model* model = models.at(modelIndex);
 
     // Bind the uniform buffer
-    const uint32_t uniformBufferOffset = static_cast<uint32_t>(
-      util::align(sizeof(RenderProcess::DynamicVertexUniformData), context->getUniformBufferOffsetAlignment()) *
-      static_cast<VkDeviceSize>(modelIndex));
+    const uint32_t uniformBufferOffset =
+      static_cast<uint32_t>(util::align(static_cast<VkDeviceSize>(sizeof(RenderProcess::DynamicVertexUniformData)),
+                                        context->getUniformBufferOffsetAlignment()) *
+                            static_cast<VkDeviceSize>(modelIndex));
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0u, 1u, &descriptorSet, 1u,
                             &uniformBufferOffset);
 

@@ -162,6 +162,30 @@ XrPath util::stringToPath(XrInstance instance, const std::string& string)
   return path;
 }
 
+bool util::createAction(XrActionSet actionSet,
+                        const std::vector<XrPath>& paths,
+                        const std::string& actionName,
+                        const std::string& localizedActionName,
+                        XrActionType type,
+                        XrAction& action)
+{
+  XrActionCreateInfo actionCreateInfo{ XR_TYPE_ACTION_CREATE_INFO };
+  actionCreateInfo.actionType = type;
+  actionCreateInfo.countSubactionPaths = static_cast<uint32_t>(paths.size());
+  actionCreateInfo.subactionPaths = paths.data();
+
+  memcpy(actionCreateInfo.actionName, actionName.data(), actionName.length() + 1u);
+  memcpy(actionCreateInfo.localizedActionName, localizedActionName.data(), localizedActionName.length() + 1u);
+
+  XrResult result = xrCreateAction(actionSet, &actionCreateInfo, &action);
+  if (XR_FAILED(result))
+  {
+    return false;
+  }
+
+  return true;
+}
+
 XrPosef util::makeIdentity()
 {
   XrPosef identity;
@@ -197,4 +221,34 @@ glm::mat4 util::createProjectionMatrix(XrFovf fov, float nearClip, float farClip
   projectionMatrix[2] = { (r + l) / w, (u + d) / h, -(farClip + nearClip) / (farClip - nearClip), -1.0f };
   projectionMatrix[3] = { 0.0f, 0.0f, -(farClip * (nearClip + nearClip)) / (farClip - nearClip), 0.0f };
   return projectionMatrix;
+}
+
+bool util::updateActionStatePose(XrSession session, XrAction action, XrPath path, XrActionStatePose& state)
+{
+  XrActionStateGetInfo actionStateGetInfo{ XR_TYPE_ACTION_STATE_GET_INFO };
+  actionStateGetInfo.action = action;
+  actionStateGetInfo.subactionPath = path;
+
+  const XrResult result = xrGetActionStatePose(session, &actionStateGetInfo, &state);
+  if (XR_FAILED(result))
+  {
+    return false;
+  }
+
+  return true;
+}
+
+bool util::updateActionStateFloat(XrSession session, XrAction action, XrPath path, XrActionStateFloat& state)
+{
+  XrActionStateGetInfo actionStateGetInfo{ XR_TYPE_ACTION_STATE_GET_INFO };
+  actionStateGetInfo.action = action;
+  actionStateGetInfo.subactionPath = path;
+
+  const XrResult result = xrGetActionStateFloat(session, &actionStateGetInfo, &state);
+  if (XR_FAILED(result))
+  {
+    return false;
+  }
+
+  return true;
 }

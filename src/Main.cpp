@@ -10,8 +10,15 @@
 
 #include <chrono>
 
+namespace
+{
+constexpr float flySpeedMultiplier = 2.5f;
+}
+
 int main()
 {
+  glm::mat4 cameraMatrix = glm::mat4(1.0f); // Transform from world to stage space
+
   Context context;
   if (!context.isValid())
   {
@@ -130,18 +137,30 @@ int main()
         return EXIT_FAILURE;
       }
 
-      // Update
       static float time = 0.0f;
       time += deltaTime;
+
+      // Update
+      for (size_t controllerIndex = 0u; controllerIndex < 2u; ++controllerIndex)
+      {
+        const float flySpeed = controllers.getFlySpeed(controllerIndex);
+        if (flySpeed > 0.0f)
+        {
+          const glm::vec3 forward = glm::normalize(controllers.getPose(controllerIndex)[2]);
+          cameraMatrix = glm::translate(cameraMatrix, forward * flySpeed * flySpeedMultiplier * deltaTime);
+        }
+      }
+
+      const glm::mat4 inverseCameraMatrix = glm::inverse(cameraMatrix);
+      handModelLeft.worldMatrix = inverseCameraMatrix * controllers.getPose(0u);
+      handModelRight.worldMatrix = inverseCameraMatrix * controllers.getPose(1u);
+      handModelRight.worldMatrix = glm::scale(handModelRight.worldMatrix, { -1.0f, 1.0f, 1.0f });
 
       bikeModel.worldMatrix =
         glm::rotate(glm::translate(glm::mat4(1.0f), { 0.5f, 0.0f, -4.5f }), time * 0.2f, { 0.0f, 1.0f, 0.0f });
 
-      handModelLeft.worldMatrix = controllers.getTransform(0u);
-      handModelRight.worldMatrix = glm::scale(controllers.getTransform(1u), { -1.0f, 1.0f, 1.0f });
-
       // Render
-      renderer.render(swapchainImageIndex, time);
+      renderer.render(cameraMatrix, swapchainImageIndex, time);
 
       const MirrorView::RenderResult mirrorResult = mirrorView.render(swapchainImageIndex);
       if (mirrorResult == MirrorView::RenderResult::Error)

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <glm/fwd.hpp>
+
 #include <vulkan/vulkan.h>
 
 #include <vector>
@@ -24,7 +26,7 @@ public:
   Renderer(const Context* context, const Headset* headset, const MeshData* meshData, const std::vector<Model*>& models);
   ~Renderer();
 
-  void render(size_t swapchainImageIndex, float time);
+  void render(const glm::mat4& cameraMatrix, size_t swapchainImageIndex, float time);
   void submit(bool useSemaphores) const;
 
   bool isValid() const;

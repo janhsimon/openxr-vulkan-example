@@ -1,9 +1,11 @@
 #pragma once
 
-#include "Context.h"
+#include <vulkan/vulkan.h>
 
 #include <string>
 #include <vector>
+
+class Context;
 
 /*
  * The pipeline class wraps a Vulkan pipeline for convenience. It describes the rendering technique to use, including
