@@ -63,16 +63,19 @@ Renderer::Renderer(const Context* context,
   descriptorSetLayoutBindings.at(0u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
   descriptorSetLayoutBindings.at(0u).descriptorCount = 1u;
   descriptorSetLayoutBindings.at(0u).stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  descriptorSetLayoutBindings.at(0u).pImmutableSamplers = nullptr;
 
   descriptorSetLayoutBindings.at(1u).binding = 1u;
   descriptorSetLayoutBindings.at(1u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   descriptorSetLayoutBindings.at(1u).descriptorCount = 1u;
   descriptorSetLayoutBindings.at(1u).stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  descriptorSetLayoutBindings.at(1u).pImmutableSamplers = nullptr;
 
   descriptorSetLayoutBindings.at(2u).binding = 2u;
   descriptorSetLayoutBindings.at(2u).descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   descriptorSetLayoutBindings.at(2u).descriptorCount = 1u;
   descriptorSetLayoutBindings.at(2u).stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+  descriptorSetLayoutBindings.at(2u).pImmutableSamplers = nullptr;
 
   VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
   descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
