@@ -359,8 +359,8 @@ Context::Context()
     applicationInfo.apiVersion = VK_API_VERSION_1_3;
     applicationInfo.applicationVersion = VK_MAKE_API_VERSION(0, 0, 1, 0);
     applicationInfo.engineVersion = VK_MAKE_API_VERSION(0, 0, 1, 0);
-    applicationInfo.pApplicationName = "OpenXR Vulkan Example";
-    applicationInfo.pEngineName = "OpenXR Vulkan Example";
+    applicationInfo.pApplicationName = applicationName.c_str();
+    applicationInfo.pEngineName = engineName.c_str();
 
     VkInstanceCreateInfo instanceCreateInfo{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
