@@ -7,7 +7,7 @@
 ImageBuffer::ImageBuffer(const Context* context,
                          VkExtent2D size,
                          VkFormat format,
-                         VkImageUsageFlagBits usage,
+                         VkImageUsageFlags usage,
                          VkSampleCountFlagBits samples,
                          VkImageAspectFlags aspect,
                          size_t layerCount)
