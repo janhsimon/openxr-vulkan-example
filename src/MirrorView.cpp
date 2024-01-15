@@ -406,7 +406,7 @@ bool MirrorView::recreateSwapchain()
   swapchainCreateInfo.minImageCount = surfaceCapabilities.minImageCount + 1u;
   swapchainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
   swapchainCreateInfo.imageFormat = surfaceFormat.format;
-  swapchainCreateInfo.imageExtent = surfaceCapabilities.currentExtent;
+  swapchainCreateInfo.imageExtent = swapchainResolution;
   swapchainCreateInfo.imageArrayLayers = 1u;
   swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
