@@ -360,9 +360,6 @@ void Renderer::submit(bool useSemaphores) const
   }
 
   constexpr VkPipelineStageFlags waitStages = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-  const VkSemaphore drawableSemaphore = renderProcess->getDrawableSemaphore();
-  const VkSemaphore presentableSemaphore = renderProcess->getPresentableSemaphore();
-  const VkFence busyFence = renderProcess->getBusyFence();
 
   VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
   submitInfo.pWaitDstStageMask = &waitStages;
@@ -371,12 +368,13 @@ void Renderer::submit(bool useSemaphores) const
 
   if (useSemaphores)
   {
+    const VkSemaphore drawableSemaphore = renderProcess->getDrawableSemaphore();
+
     submitInfo.waitSemaphoreCount = 1u;
     submitInfo.pWaitSemaphores = &drawableSemaphore;
-    submitInfo.signalSemaphoreCount = 1u;
-    submitInfo.pSignalSemaphores = &presentableSemaphore;
   }
 
+  const VkFence busyFence = renderProcess->getBusyFence();
   if (vkQueueSubmit(context->getVkDrawQueue(), 1u, &submitInfo, busyFence) != VK_SUCCESS)
   {
     return;
@@ -396,9 +394,4 @@ VkCommandBuffer Renderer::getCurrentCommandBuffer() const
 VkSemaphore Renderer::getCurrentDrawableSemaphore() const
 {
   return renderProcesses.at(currentRenderProcessIndex)->getDrawableSemaphore();
-}
-
-VkSemaphore Renderer::getCurrentPresentableSemaphore() const
-{
-  return renderProcesses.at(currentRenderProcessIndex)->getPresentableSemaphore();
 }

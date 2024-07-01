@@ -269,11 +269,7 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
 
 void MirrorView::present()
 {
-  const VkSemaphore presentableSemaphore = renderer->getCurrentPresentableSemaphore();
-
   VkPresentInfoKHR presentInfo{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-  presentInfo.waitSemaphoreCount = 1u;
-  presentInfo.pWaitSemaphores = &presentableSemaphore;
   presentInfo.swapchainCount = 1u;
   presentInfo.pSwapchains = &swapchain;
   presentInfo.pImageIndices = &destinationImageIndex;

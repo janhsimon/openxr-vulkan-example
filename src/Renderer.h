@@ -18,7 +18,7 @@ class RenderProcess;
  * The renderer class facilitates rendering with Vulkan. It is initialized with a constant list of models to render and
  * holds the vertex/index buffer, the pipelines that define the rendering techniques to use, as well as a number of
  * render processes. Note that all resources that need to be duplicated in order to be able to render several frames in
- * parallel is held by this number of render processes.
+ * parallel are held by this number of render processes.
  */
 class Renderer final
 {
@@ -32,7 +32,6 @@ public:
   bool isValid() const;
   VkCommandBuffer getCurrentCommandBuffer() const;
   VkSemaphore getCurrentDrawableSemaphore() const;
-  VkSemaphore getCurrentPresentableSemaphore() const;
 
 private:
   bool valid = true;

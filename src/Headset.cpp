@@ -106,7 +106,7 @@ Headset::Headset(const Context* context) : context(context)
   const uint32_t vkDrawQueueFamilyIndex = context->getVkDrawQueueFamilyIndex();
 
   // Create a session with Vulkan graphics binding
-  XrGraphicsBindingVulkanKHR graphicsBinding{ XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR };
+  XrGraphicsBindingVulkan2KHR graphicsBinding{ XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR };
   graphicsBinding.device = device;
   graphicsBinding.instance = context->getVkInstance();
   graphicsBinding.physicalDevice = vkPhysicalDevice;
@@ -265,11 +265,11 @@ Headset::Headset(const Context* context) : context(context)
     }
 
     // Retrieve the swapchain images
-    std::vector<XrSwapchainImageVulkanKHR> swapchainImages;
+    std::vector<XrSwapchainImageVulkan2KHR> swapchainImages;
     swapchainImages.resize(swapchainImageCount);
-    for (XrSwapchainImageVulkanKHR& swapchainImage : swapchainImages)
+    for (XrSwapchainImageVulkan2KHR& swapchainImage : swapchainImages)
     {
-      swapchainImage.type = XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR;
+      swapchainImage.type = XR_TYPE_SWAPCHAIN_IMAGE_VULKAN2_KHR;
     }
 
     XrSwapchainImageBaseHeader* data = reinterpret_cast<XrSwapchainImageBaseHeader*>(swapchainImages.data());

@@ -40,10 +40,10 @@ private:
   bool valid = true;
 
   // Extension function pointers
-  PFN_xrGetVulkanInstanceExtensionsKHR xrGetVulkanInstanceExtensionsKHR = nullptr;
-  PFN_xrGetVulkanGraphicsDeviceKHR xrGetVulkanGraphicsDeviceKHR = nullptr;
-  PFN_xrGetVulkanDeviceExtensionsKHR xrGetVulkanDeviceExtensionsKHR = nullptr;
-  PFN_xrGetVulkanGraphicsRequirementsKHR xrGetVulkanGraphicsRequirementsKHR = nullptr;
+  PFN_xrCreateVulkanInstanceKHR xrCreateVulkanInstanceKHR = nullptr;
+  PFN_xrCreateVulkanDeviceKHR xrCreateVulkanDeviceKHR = nullptr;
+  PFN_xrGetVulkanGraphicsDevice2KHR xrGetVulkanGraphicsDevice2KHR = nullptr;
+  PFN_xrGetVulkanGraphicsRequirements2KHR xrGetVulkanGraphicsRequirements2KHR = nullptr;
 
   XrInstance xrInstance = nullptr;
   XrSystemId systemId = 0u;

@@ -4,11 +4,11 @@
 
 #include <glfw/glfw3.h>
 
+#include <array>
 #include <cstring>
 #include <sstream>
 
 #ifdef DEBUG
-  #include <array>
   #include <iostream>
 #endif
 
@@ -18,7 +18,6 @@ constexpr XrViewConfigurationType viewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_
 constexpr XrEnvironmentBlendMode environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 
 const std::string applicationName = "OpenXR Vulkan Example";
-const std::string engineName = "OpenXR Vulkan Example";
 } // namespace
 
 Context::Context()
@@ -72,12 +71,11 @@ Context::Context()
     XrApplicationInfo applicationInfo;
     applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
     applicationInfo.applicationVersion = static_cast<uint32_t>(XR_MAKE_VERSION(0, 1, 0));
-    applicationInfo.engineVersion = static_cast<uint32_t>(XR_MAKE_VERSION(0, 1, 0));
-
+    
     memcpy(applicationInfo.applicationName, applicationName.data(), applicationName.length() + 1u);
-    memcpy(applicationInfo.engineName, engineName.data(), engineName.length() + 1u);
+    memset(applicationInfo.engineName, 0, 1u);
 
-    std::vector<const char*> extensions = { XR_KHR_VULKAN_ENABLE_EXTENSION_NAME };
+    std::vector<const char*> extensions = { XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME };
 
 #ifdef DEBUG
     // Add the OpenXR debug instance extension
@@ -121,34 +119,34 @@ Context::Context()
   }
 
   // Load the required OpenXR extension functions
-  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanInstanceExtensionsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanInstanceExtensionsKHR)))
+  if (!util::loadXrExtensionFunction(xrInstance, "xrCreateVulkanInstanceKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrCreateVulkanInstanceKHR)))
   {
-    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrGetVulkanInstanceExtensionsKHR\"");
+    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrCreateVulkanInstanceKHR\"");
     valid = false;
     return;
   }
 
-  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanGraphicsDeviceKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsDeviceKHR)))
+  if (!util::loadXrExtensionFunction(xrInstance, "xrCreateVulkanDeviceKHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrCreateVulkanDeviceKHR)))
   {
-    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrGetVulkanGraphicsDeviceKHR\"");
+    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrCreateVulkanDeviceKHR\"");
     valid = false;
     return;
   }
 
-  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanDeviceExtensionsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanDeviceExtensionsKHR)))
+  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanGraphicsDevice2KHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsDevice2KHR)))
   {
-    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrGetVulkanDeviceExtensionsKHR\"");
+    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrGetVulkanGraphicsDevice2KHR\"");
     valid = false;
     return;
   }
 
-  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanGraphicsRequirementsKHR",
-                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsRequirementsKHR)))
+  if (!util::loadXrExtensionFunction(xrInstance, "xrGetVulkanGraphicsRequirements2KHR",
+                                     reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsRequirements2KHR)))
   {
-    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrGetVulkanGraphicsRequirementsKHR\"");
+    util::error(Error::FeatureNotSupported, "OpenXR extension function \"xrGetVulkanGraphicsRequirements2KHR\"");
     valid = false;
     return;
   }
@@ -296,34 +294,6 @@ Context::Context()
     }
   }
 
-  // Get the required Vulkan instance extensions from OpenXR and add them
-  {
-    uint32_t count;
-    result = xrGetVulkanInstanceExtensionsKHR(xrInstance, systemId, 0u, &count, nullptr);
-    if (XR_FAILED(result))
-    {
-      util::error(Error::GenericOpenXR);
-      valid = false;
-      return;
-    }
-
-    std::string buffer;
-    buffer.resize(count);
-    result = xrGetVulkanInstanceExtensionsKHR(xrInstance, systemId, count, &count, buffer.data());
-    if (XR_FAILED(result))
-    {
-      util::error(Error::GenericOpenXR);
-      valid = false;
-      return;
-    }
-
-    const std::vector<const char*> instanceExtensions = util::unpackExtensionString(buffer);
-    for (const char* extension : instanceExtensions)
-    {
-      vulkanInstanceExtensions.push_back(extension);
-    }
-  }
-
 #ifdef DEBUG
   // Add the Vulkan debug instance extension
   vulkanInstanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -360,7 +330,6 @@ Context::Context()
     applicationInfo.applicationVersion = VK_MAKE_API_VERSION(0, 0, 1, 0);
     applicationInfo.engineVersion = VK_MAKE_API_VERSION(0, 0, 1, 0);
     applicationInfo.pApplicationName = applicationName.c_str();
-    applicationInfo.pEngineName = engineName.c_str();
 
     VkInstanceCreateInfo instanceCreateInfo{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
@@ -415,7 +384,19 @@ Context::Context()
     instanceCreateInfo.ppEnabledLayerNames = layers.data();
 #endif
 
-    if (vkCreateInstance(&instanceCreateInfo, nullptr, &vkInstance) != VK_SUCCESS)
+    XrVulkanInstanceCreateInfoKHR createInfo{ XR_TYPE_VULKAN_INSTANCE_CREATE_INFO_KHR };
+    createInfo.pfnGetInstanceProcAddr = &vkGetInstanceProcAddr;
+    createInfo.systemId = systemId;
+    createInfo.vulkanCreateInfo = &instanceCreateInfo;
+    VkResult vkResult;
+    if (XR_FAILED(xrCreateVulkanInstanceKHR(xrInstance, &createInfo, &vkInstance, &vkResult)))
+    {
+      util::error(Error::GenericOpenXR);
+      valid = false;
+      return;
+    }
+
+    if (vkResult != VK_SUCCESS)
     {
       util::error(Error::GenericVulkan);
       valid = false;
@@ -518,7 +499,10 @@ Context::~Context()
 bool Context::createDevice(VkSurfaceKHR mirrorSurface)
 {
   // Retrieve the physical device from OpenXR
-  XrResult result = xrGetVulkanGraphicsDeviceKHR(xrInstance, systemId, vkInstance, &physicalDevice);
+  XrVulkanGraphicsDeviceGetInfoKHR vulkanGraphicsDeviceGetInfo{ XR_TYPE_VULKAN_GRAPHICS_DEVICE_GET_INFO_KHR };
+  vulkanGraphicsDeviceGetInfo.systemId = systemId;
+  vulkanGraphicsDeviceGetInfo.vulkanInstance = vkInstance;
+  XrResult result = xrGetVulkanGraphicsDevice2KHR(xrInstance, &vulkanGraphicsDeviceGetInfo, &physicalDevice);
   if (XR_FAILED(result))
   {
     util::error(Error::GenericOpenXR);
@@ -627,31 +611,8 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     }
   }
 
-  // Get the required Vulkan device extensions from OpenXR
-  std::vector<const char*> vulkanDeviceExtensions;
-  {
-    uint32_t count;
-    result = xrGetVulkanDeviceExtensionsKHR(xrInstance, systemId, 0u, &count, nullptr);
-    if (XR_FAILED(result))
-    {
-      util::error(Error::GenericOpenXR);
-      return false;
-    }
-
-    std::string buffer;
-    buffer.resize(count);
-    result = xrGetVulkanDeviceExtensionsKHR(xrInstance, systemId, count, &count, buffer.data());
-    if (XR_FAILED(result))
-    {
-      util::error(Error::GenericOpenXR);
-      return false;
-    }
-
-    vulkanDeviceExtensions = util::unpackExtensionString(buffer);
-  }
-
-  // Add the required swapchain extension for mirror view
-  vulkanDeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+  // Require the swapchain extension for the mirror view
+  constexpr std::array vulkanDeviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
   // Check that all Vulkan device extensions are supported
   {
@@ -743,7 +704,20 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures;
     deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(deviceQueueCreateInfos.size());
     deviceCreateInfo.pQueueCreateInfos = deviceQueueCreateInfos.data();
-    if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS)
+
+    XrVulkanDeviceCreateInfoKHR createInfo{ XR_TYPE_VULKAN_DEVICE_CREATE_INFO_KHR };
+    createInfo.pfnGetInstanceProcAddr = &vkGetInstanceProcAddr;
+    createInfo.systemId = systemId;
+    createInfo.vulkanCreateInfo = &deviceCreateInfo;
+    createInfo.vulkanPhysicalDevice = physicalDevice;
+    VkResult vkResult;
+    if (XR_FAILED(xrCreateVulkanDeviceKHR(xrInstance, &createInfo, &device, &vkResult)))
+    {
+      util::error(Error::GenericOpenXR);
+      return false;
+    }
+
+    if (vkResult != VK_SUCCESS)
     {
       util::error(Error::GenericVulkan);
       return false;
@@ -751,8 +725,8 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
   }
 
   // Check the graphics requirements for Vulkan
-  XrGraphicsRequirementsVulkanKHR graphicsRequirements{ XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR };
-  result = xrGetVulkanGraphicsRequirementsKHR(xrInstance, systemId, &graphicsRequirements);
+  XrGraphicsRequirementsVulkan2KHR graphicsRequirements{ XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN2_KHR };
+  result = xrGetVulkanGraphicsRequirements2KHR(xrInstance, systemId, &graphicsRequirements);
   if (XR_FAILED(result))
   {
     util::error(Error::GenericOpenXR);

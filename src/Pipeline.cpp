@@ -121,7 +121,6 @@ Pipeline::Pipeline(const Context* context,
   pipelineDepthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
 
   VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-  graphicsPipelineCreateInfo.flags = VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT;
   graphicsPipelineCreateInfo.layout = pipelineLayout;
   graphicsPipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
   graphicsPipelineCreateInfo.pStages = shaderStages.data();
