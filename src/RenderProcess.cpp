@@ -41,6 +41,16 @@ RenderProcess::RenderProcess(const Context* context,
     return;
   }
 
+#ifdef DEBUG
+  if (context->setDebugObjectName(reinterpret_cast<uint64_t>(commandBuffer), VK_OBJECT_TYPE_COMMAND_BUFFER,
+                                  "OXR_VK_X Command Buffer") != VK_SUCCESS)
+  {
+    util::error(Error::GenericVulkan);
+    valid = false;
+    return;
+  }
+#endif
+
   // Create a semaphore
   VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
   if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &drawableSemaphore) != VK_SUCCESS)

@@ -5,6 +5,8 @@
 #define XR_USE_GRAPHICS_API_VULKAN
 #include <openxr/openxr_platform.h>
 
+#include <string>
+
 /*
  * The context class handles the initial loading of both OpenXR and Vulkan base functionality such as instances, OpenXR
  * sessions, Vulkan devices and queues, and so on. It also loads debug utility messengers for both OpenXR and Vulkan if
@@ -36,6 +38,10 @@ public:
   VkDeviceSize getUniformBufferOffsetAlignment() const;
   VkSampleCountFlagBits getMultisampleCount() const;
 
+#ifdef DEBUG
+  VkResult setDebugObjectName(uint64_t objectHandle, VkObjectType objectType, const std::string& objectName) const;
+#endif
+
 private:
   bool valid = true;
 
@@ -64,5 +70,7 @@ private:
   PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT = nullptr;
   PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = nullptr;
   VkDebugUtilsMessengerEXT vkDebugUtilsMessenger = nullptr;
+
+  PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT = nullptr;
 #endif
 };

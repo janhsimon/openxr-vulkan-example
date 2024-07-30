@@ -459,6 +459,15 @@ Context::Context()
       return;
     }
   }
+
+  vkSetDebugUtilsObjectNameEXT = reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(
+    util::loadVkExtensionFunction(vkInstance, "vkSetDebugUtilsObjectNameEXT"));
+  if (!vkSetDebugUtilsObjectNameEXT)
+  {
+    util::error(Error::FeatureNotSupported, "Vulkan extension function \"vkSetDebugUtilsObjectNameEXT\"");
+    valid = false;
+    return;
+  }
 #endif
 }
 
@@ -748,6 +757,34 @@ bool Context::createDevice(VkSurfaceKHR mirrorSurface)
     return false;
   }
 
+#ifdef DEBUG
+  if (drawQueue == presentQueue)
+  {
+    if (setDebugObjectName(reinterpret_cast<uint64_t>(drawQueue), VK_OBJECT_TYPE_QUEUE,
+                           "OXR_VK_X Draw/Present Queue") != VK_SUCCESS)
+    {
+      util::error(Error::GenericVulkan);
+      return false;
+    }
+  }
+  else
+  {
+    if (setDebugObjectName(reinterpret_cast<uint64_t>(drawQueue), VK_OBJECT_TYPE_QUEUE, "OXR_VK_X Draw Queue") !=
+        VK_SUCCESS)
+    {
+      util::error(Error::GenericVulkan);
+      return false;
+    }
+
+    if (setDebugObjectName(reinterpret_cast<uint64_t>(presentQueue), VK_OBJECT_TYPE_QUEUE, "OXR_VK_X Present Queue") !=
+        VK_SUCCESS)
+    {
+      util::error(Error::GenericVulkan);
+      return false;
+    }
+  }
+#endif
+
   return true;
 }
 
@@ -815,3 +852,16 @@ VkSampleCountFlagBits Context::getMultisampleCount() const
 {
   return multisampleCount;
 }
+
+#ifdef DEBUG
+VkResult
+Context::setDebugObjectName(uint64_t objectHandle, VkObjectType objectType, const std::string& objectName) const
+{
+
+  VkDebugUtilsObjectNameInfoEXT nameInfo{ VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT };
+  nameInfo.objectHandle = objectHandle;
+  nameInfo.objectType = objectType;
+  nameInfo.pObjectName = objectName.c_str();
+  return vkSetDebugUtilsObjectNameEXT(device, &nameInfo);
+}
+#endif

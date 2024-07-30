@@ -8,6 +8,7 @@
 #include <glm/mat4x4.hpp>
 
 #include <array>
+#include <sstream>
 
 namespace
 {
@@ -98,6 +99,16 @@ Headset::Headset(const Context* context) : context(context)
       valid = false;
       return;
     }
+
+#ifdef DEBUG
+    if (context->setDebugObjectName(reinterpret_cast<uint64_t>(renderPass), VK_OBJECT_TYPE_RENDER_PASS,
+                                    "OXR_VK_X Render Pass") != VK_SUCCESS)
+    {
+      util::error(Error::GenericVulkan);
+      valid = false;
+      return;
+    }
+#endif
   }
 
   const XrInstance xrInstance = context->getXrInstance();
@@ -296,6 +307,17 @@ Headset::Headset(const Context* context) : context(context)
         valid = false;
         return;
       }
+
+#ifdef DEBUG
+      std::stringstream s;
+      s << "OXR_VK_X Headset Swapchain Image #" << renderTargetIndex;
+      if (context->setDebugObjectName(reinterpret_cast<uint64_t>(image), VK_OBJECT_TYPE_IMAGE, s.str()) != VK_SUCCESS)
+      {
+        util::error(Error::GenericVulkan);
+        valid = false;
+        return;
+      }
+#endif
     }
   }
 
