@@ -8,7 +8,10 @@
 #include <glm/mat4x4.hpp>
 
 #include <array>
-#include <sstream>
+
+#if DEBUG
+  #include <sstream>
+#endif
 
 namespace
 {
