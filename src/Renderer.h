@@ -32,6 +32,7 @@ public:
   bool isValid() const;
   VkCommandBuffer getCurrentCommandBuffer() const;
   VkSemaphore getCurrentDrawableSemaphore() const;
+  VkSemaphore getCurrentPresentableSemaphore() const;
 
 private:
   bool valid = true;

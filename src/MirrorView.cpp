@@ -236,40 +236,57 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
   vkCmdBlitImage(commandBuffer, sourceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destinationImage,
                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &imageBlit, VK_FILTER_NEAREST);
 
-  // Convert the source image layout from transfer source to color attachment
-  imageMemoryBarrier.image = sourceImage;
-  imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-  imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-  imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageMemoryBarrier.subresourceRange.layerCount = 1u;
-  imageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
-  imageMemoryBarrier.subresourceRange.levelCount = 1u;
-  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                       VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
+  {
+    VkImageMemoryBarrier sourceImageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    sourceImageMemoryBarrier.image = sourceImage;
+    sourceImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    sourceImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    sourceImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    sourceImageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    sourceImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    sourceImageMemoryBarrier.subresourceRange.layerCount = 1u;
+    sourceImageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
+    sourceImageMemoryBarrier.subresourceRange.levelCount = 1u;
+    sourceImageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
 
-  // Convert the destination image layout from transfer destination to present
-  imageMemoryBarrier.image = destinationImage;
-  imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  imageMemoryBarrier.dstAccessMask = 0u;
-  imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageMemoryBarrier.subresourceRange.layerCount = 1u;
-  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
-  imageMemoryBarrier.subresourceRange.levelCount = 1u;
-  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
+    // Wait for the transfer stage to be done from the blit drawcall above
+    // And don't start any of the following resolve/present work yet
+
+    VkImageMemoryBarrier destinationImageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    destinationImageMemoryBarrier.image = destinationImage;
+    destinationImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    destinationImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    destinationImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    destinationImageMemoryBarrier.dstAccessMask = VK_ACCESS_NONE;
+    destinationImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    destinationImageMemoryBarrier.subresourceRange.layerCount = 1u;
+    destinationImageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
+    destinationImageMemoryBarrier.subresourceRange.levelCount = 1u;
+    destinationImageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
+
+    // Wait for the transfer stage to be done from the blit drawcall above
+    // And don't start any of the following resolve/present work yet
+    // vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+    //                    VK_PIPELINE_STAGE_TRANSFER_BIT /* was VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT*/,
+    //                  VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &destinationImageMemoryBarrier);
+
+    const std::array imageMemoryBarriers = { sourceImageMemoryBarrier, destinationImageMemoryBarrier };
+
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr,
+                         static_cast<uint32_t>(imageMemoryBarriers.size()), imageMemoryBarriers.data());
+  }
 
   return RenderResult::Visible;
 }
 
 void MirrorView::present()
 {
+  const VkSemaphore presentableSemaphore = renderer->getCurrentPresentableSemaphore();
+
   VkPresentInfoKHR presentInfo{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+  presentInfo.waitSemaphoreCount = 1u;
+  presentInfo.pWaitSemaphores = &presentableSemaphore;
   presentInfo.swapchainCount = 1u;
   presentInfo.pSwapchains = &swapchain;
   presentInfo.pImageIndices = &destinationImageIndex;

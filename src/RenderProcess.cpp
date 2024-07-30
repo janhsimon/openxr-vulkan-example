@@ -60,6 +60,13 @@ RenderProcess::RenderProcess(const Context* context,
     return;
   }
 
+  if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &presentableSemaphore) != VK_SUCCESS)
+  {
+    util::error(Error::GenericVulkan);
+    valid = false;
+    return;
+  }
+
   // Create a memory fence
   VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Make sure the fence starts off signaled
@@ -180,6 +187,11 @@ RenderProcess::~RenderProcess()
       vkDestroyFence(device, busyFence, nullptr);
     }
 
+    if (presentableSemaphore)
+    {
+      vkDestroySemaphore(device, presentableSemaphore, nullptr);
+    }
+
     if (drawableSemaphore)
     {
       vkDestroySemaphore(device, drawableSemaphore, nullptr);
@@ -200,6 +212,11 @@ VkCommandBuffer RenderProcess::getCommandBuffer() const
 VkSemaphore RenderProcess::getDrawableSemaphore() const
 {
   return drawableSemaphore;
+}
+
+VkSemaphore RenderProcess::getPresentableSemaphore() const
+{
+  return presentableSemaphore;
 }
 
 VkFence RenderProcess::getBusyFence() const

@@ -46,6 +46,7 @@ public:
   bool isValid() const;
   VkCommandBuffer getCommandBuffer() const;
   VkSemaphore getDrawableSemaphore() const;
+  VkSemaphore getPresentableSemaphore() const;
   VkFence getBusyFence() const;
   VkDescriptorSet getDescriptorSet() const;
 
@@ -56,7 +57,7 @@ private:
 
   const Context* context = nullptr;
   VkCommandBuffer commandBuffer = nullptr;
-  VkSemaphore drawableSemaphore = nullptr;
+  VkSemaphore drawableSemaphore = nullptr, presentableSemaphore = nullptr;
   VkFence busyFence = nullptr;
   DataBuffer* uniformBuffer = nullptr;
   void* uniformBufferMemory = nullptr;
