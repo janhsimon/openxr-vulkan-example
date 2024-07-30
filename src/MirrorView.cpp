@@ -10,6 +10,7 @@
 
 #include <glm/common.hpp>
 
+#include <array>
 #include <sstream>
 
 namespace
@@ -162,40 +163,46 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
   }
 
   const VkCommandBuffer commandBuffer = renderer->getCurrentCommandBuffer();
-  const VkImage sourceImage = headset->getRenderTarget(swapchainImageIndex)->getImage();
-  const VkImage destinationImage = swapchainImages.at(destinationImageIndex);
-  const VkExtent2D eyeResolution = headset->getEyeResolution(mirrorEyeIndex);
+  const VkImage sourceImage = headset->getRenderTarget(swapchainImageIndex)->getImage(); // OpenXR swapchain image
+  const VkImage destinationImage = swapchainImages.at(destinationImageIndex);            // Mirror view swapchain image
 
-  // Convert the source image layout from undefined to transfer source
-  VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-  imageMemoryBarrier.image = sourceImage;
-  imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-  imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-  imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageMemoryBarrier.subresourceRange.layerCount = 1u;
-  imageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
-  imageMemoryBarrier.subresourceRange.levelCount = 1u;
-  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
+  // Transition the layer of the OpenXR swapchain image that is to be mirrored in the mirror view to the transfer source
+  // optimal layout and transition the mirror view swapchain image to the transfer destination optimal layout. Also
+  // ensure that all color attachment write access in the color attachment output stage has concluded in the OpenXR
+  // swapchain image before allowing any transfer read access in the transfer stage.
+  {
+    VkImageMemoryBarrier sourceImageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    sourceImageMemoryBarrier.image = sourceImage;
+    sourceImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    sourceImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    sourceImageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    sourceImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    sourceImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    sourceImageMemoryBarrier.subresourceRange.layerCount = 1u;
+    sourceImageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
+    sourceImageMemoryBarrier.subresourceRange.levelCount = 1u;
+    sourceImageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
 
-  // Convert the destination image layout from undefined to transfer destination
-  imageMemoryBarrier.image = destinationImage;
-  imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  imageMemoryBarrier.srcAccessMask = 0u;
-  imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageMemoryBarrier.subresourceRange.layerCount = 1u;
-  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
-  imageMemoryBarrier.subresourceRange.levelCount = 1u;
-  imageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
+    VkImageMemoryBarrier destinationImageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    destinationImageMemoryBarrier.image = destinationImage;
+    destinationImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    destinationImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    destinationImageMemoryBarrier.srcAccessMask = VK_ACCESS_NONE;
+    destinationImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    destinationImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    destinationImageMemoryBarrier.subresourceRange.layerCount = 1u;
+    destinationImageMemoryBarrier.subresourceRange.baseArrayLayer = 0u;
+    destinationImageMemoryBarrier.subresourceRange.levelCount = 1u;
+    destinationImageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
+
+    const std::array imageMemoryBarriers = { sourceImageMemoryBarrier, destinationImageMemoryBarrier };
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr,
+                         static_cast<uint32_t>(imageMemoryBarriers.size()), imageMemoryBarriers.data());
+  }
 
   // We need to crop the source image region to preserve the aspect ratio of the mirror view window
+  const VkExtent2D eyeResolution = headset->getEyeResolution(mirrorEyeIndex);
   const glm::vec2 sourceResolution = { static_cast<float>(eyeResolution.width),
                                        static_cast<float>(eyeResolution.height) };
   const float sourceAspectRatio = sourceResolution.x / sourceResolution.y;
@@ -236,21 +243,22 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
   vkCmdBlitImage(commandBuffer, sourceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destinationImage,
                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &imageBlit, VK_FILTER_NEAREST);
 
+  // Transition the layer of the OpenXR swapchain image that was mirrored to the mirror view back to the color
+  // attachment optimal layout and transition the mirror view swapchain image to the present source layout. Also ensure
+  // that all transfer read access in the transfer stage has concluded for the OpenXR swapchain image before allowing
+  // any transfer read access in the transfer stage.
   {
     VkImageMemoryBarrier sourceImageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     sourceImageMemoryBarrier.image = sourceImage;
     sourceImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     sourceImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     sourceImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    sourceImageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    sourceImageMemoryBarrier.dstAccessMask = VK_ACCESS_NONE;
     sourceImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     sourceImageMemoryBarrier.subresourceRange.layerCount = 1u;
     sourceImageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
     sourceImageMemoryBarrier.subresourceRange.levelCount = 1u;
     sourceImageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
-
-    // Wait for the transfer stage to be done from the blit drawcall above
-    // And don't start any of the following resolve/present work yet
 
     VkImageMemoryBarrier destinationImageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     destinationImageMemoryBarrier.image = destinationImage;
@@ -264,14 +272,7 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
     destinationImageMemoryBarrier.subresourceRange.levelCount = 1u;
     destinationImageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
 
-    // Wait for the transfer stage to be done from the blit drawcall above
-    // And don't start any of the following resolve/present work yet
-    // vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-    //                    VK_PIPELINE_STAGE_TRANSFER_BIT /* was VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT*/,
-    //                  VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &destinationImageMemoryBarrier);
-
     const std::array imageMemoryBarriers = { sourceImageMemoryBarrier, destinationImageMemoryBarrier };
-
     vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr,
                          static_cast<uint32_t>(imageMemoryBarriers.size()), imageMemoryBarriers.data());

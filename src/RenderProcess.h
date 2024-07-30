@@ -13,9 +13,9 @@ class DataBuffer;
 /*
  * The render process class consolidates all the resources that needs to be duplicated for each frame that can be
  * rendered to in parallel. The renderer owns a render process for each frame that can be processed at the same time,
- * and each render process holds their own uniform buffer, command buffer, semaphore and memory fence. With this
- * duplication, the application can be sure that one frame does not modify a resource that is still in use by another
- * simultaneous frame.
+ * and each render process holds their own uniform buffer, command buffer, semaphore and fence. With this duplication,
+ * the application can be sure that one frame does not modify a resource that is still in use by another simultaneous
+ * frame.
  */
 class RenderProcess final
 {

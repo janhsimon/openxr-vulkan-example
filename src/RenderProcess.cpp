@@ -51,7 +51,7 @@ RenderProcess::RenderProcess(const Context* context,
   }
 #endif
 
-  // Create a semaphore
+  // Create semaphores
   VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
   if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &drawableSemaphore) != VK_SUCCESS)
   {
@@ -67,9 +67,8 @@ RenderProcess::RenderProcess(const Context* context,
     return;
   }
 
-  // Create a memory fence
+  // Create a fence
   VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-  fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Make sure the fence starts off signaled
   if (vkCreateFence(device, &fenceCreateInfo, nullptr, &busyFence) != VK_SUCCESS)
   {
     util::error(Error::GenericVulkan);
