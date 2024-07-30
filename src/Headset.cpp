@@ -256,6 +256,7 @@ Headset::Headset(const Context* context) : context(context)
     swapchainCreateInfo.arraySize = static_cast<uint32_t>(eyeCount);
     swapchainCreateInfo.faceCount = 1u;
     swapchainCreateInfo.mipCount = 1u;
+    swapchainCreateInfo.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
 
     result = xrCreateSwapchain(session, &swapchainCreateInfo, &swapchain);
     if (XR_FAILED(result))
