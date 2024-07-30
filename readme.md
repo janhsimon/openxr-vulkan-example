@@ -2,7 +2,7 @@
 
 # Overview
 
-This project demonstrates how you can write your own VR application using OpenXR and Vulkan. These are its main features:
+This project demonstrates how you can write your own VR application using OpenXR 1.1 and Vulkan 1.3. These are its main features:
 
 - Basic rendering of example scene to the headset and into a resizeable mirror view on your desktop monitor. 
 - Focus on easy to read and understand C++ without smart pointers, inheritance, templates, etc.
