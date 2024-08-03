@@ -246,6 +246,20 @@ void Renderer::render(const glm::mat4& cameraMatrix, size_t swapchainImageIndex,
 
   RenderProcess* renderProcess = renderProcesses.at(currentRenderProcessIndex);
 
+  const VkDevice device = context->getVkDevice();
+  const VkFence busyFence = renderProcess->getBusyFence();
+
+  // Wait until the render process is free to use again
+  if (vkWaitForFences(device, 1u, &busyFence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
+  {
+    return;
+  }
+
+  if (vkResetFences(device, 1u, &busyFence) != VK_SUCCESS)
+  {
+    return;
+  }
+
   const VkCommandBuffer commandBuffer = renderProcess->getCommandBuffer();
   if (vkResetCommandBuffer(commandBuffer, 0u) != VK_SUCCESS)
   {
@@ -372,19 +386,6 @@ void Renderer::submit(bool useSemaphores) const
 
   const VkFence busyFence = renderProcess->getBusyFence();
   if (vkQueueSubmit(context->getVkDrawQueue(), 1u, &submitInfo, busyFence) != VK_SUCCESS)
-  {
-    return;
-  }
-
-  // Now that all draw calls have been submitted to the draw queue, we use a fence to ensure that they are all finished
-  // executing before moving on and giving control back to the OpenXR runtime by calling xrReleaseSwapchainImage()
-  const VkDevice device = context->getVkDevice();
-  if (vkWaitForFences(device, 1u, &busyFence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
-  {
-    return;
-  }
-
-  if (vkResetFences(device, 1u, &busyFence) != VK_SUCCESS)
   {
     return;
   }

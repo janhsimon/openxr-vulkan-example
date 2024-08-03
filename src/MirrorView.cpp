@@ -179,7 +179,7 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
     sourceImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     sourceImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     sourceImageMemoryBarrier.subresourceRange.layerCount = 1u;
-    sourceImageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
+    sourceImageMemoryBarrier.subresourceRange.baseArrayLayer = static_cast<uint32_t>(mirrorEyeIndex);
     sourceImageMemoryBarrier.subresourceRange.levelCount = 1u;
     sourceImageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
 
@@ -229,7 +229,7 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
                               static_cast<int32_t>(cropOffset.y + cropResolution.y), 1 };
   imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   imageBlit.srcSubresource.mipLevel = 0u;
-  imageBlit.srcSubresource.baseArrayLayer = mirrorEyeIndex;
+  imageBlit.srcSubresource.baseArrayLayer = static_cast<uint32_t>(mirrorEyeIndex);
   imageBlit.srcSubresource.layerCount = 1u;
 
   imageBlit.dstOffsets[0] = { 0, 0, 0 };
@@ -253,10 +253,10 @@ MirrorView::RenderResult MirrorView::render(uint32_t swapchainImageIndex)
     sourceImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     sourceImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     sourceImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    sourceImageMemoryBarrier.dstAccessMask = VK_ACCESS_NONE;
+    sourceImageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
     sourceImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     sourceImageMemoryBarrier.subresourceRange.layerCount = 1u;
-    sourceImageMemoryBarrier.subresourceRange.baseArrayLayer = mirrorEyeIndex;
+    sourceImageMemoryBarrier.subresourceRange.baseArrayLayer = static_cast<uint32_t>(mirrorEyeIndex);
     sourceImageMemoryBarrier.subresourceRange.levelCount = 1u;
     sourceImageMemoryBarrier.subresourceRange.baseMipLevel = 0u;
 

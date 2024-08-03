@@ -80,6 +80,33 @@ Headset::Headset(const Context* context) : context(context)
     resolveAttachmentReference.attachment = 2u;
     resolveAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    // This subpass dependency waits with the transition to the color attachment optimal layout that takes place when
+    // calling vkCmdBeginRenderPass() until the draw calls in the render pass are in the appropriate pipeline stages
+    VkSubpassDependency subpassDependencyRenderPassBegin;
+    subpassDependencyRenderPassBegin.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+    subpassDependencyRenderPassBegin.srcSubpass = VK_SUBPASS_EXTERNAL;
+    subpassDependencyRenderPassBegin.dstSubpass = 0;
+    subpassDependencyRenderPassBegin.srcAccessMask = VK_ACCESS_NONE;
+    subpassDependencyRenderPassBegin.dstAccessMask =
+      VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    subpassDependencyRenderPassBegin.srcStageMask =
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    subpassDependencyRenderPassBegin.dstStageMask =
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+
+    // This subpass dependency ensures that all color and depth/stencil attachment writes in the color attachment output
+    // and late fragment tests stages have finished before any draw calls after vkCmdEndRenderPass() begin
+    VkSubpassDependency subpassDependencyRenderPassEnd;
+    subpassDependencyRenderPassEnd.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+    subpassDependencyRenderPassEnd.srcSubpass = 0;
+    subpassDependencyRenderPassEnd.dstSubpass = VK_SUBPASS_EXTERNAL;
+    subpassDependencyRenderPassEnd.srcAccessMask =
+      VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    subpassDependencyRenderPassEnd.dstAccessMask = VK_ACCESS_NONE;
+    subpassDependencyRenderPassEnd.srcStageMask =
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    subpassDependencyRenderPassEnd.dstStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
     VkSubpassDescription subpassDescription{};
     subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpassDescription.colorAttachmentCount = 1u;
@@ -90,12 +117,16 @@ Headset::Headset(const Context* context) : context(context)
     const std::array attachments = { colorAttachmentDescription, depthAttachmentDescription,
                                      resolveAttachmentDescription };
 
+    const std::array subpassDependencies = { subpassDependencyRenderPassBegin, subpassDependencyRenderPassEnd };
+
     VkRenderPassCreateInfo renderPassCreateInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
     renderPassCreateInfo.pNext = &renderPassMultiviewCreateInfo;
     renderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
     renderPassCreateInfo.pAttachments = attachments.data();
     renderPassCreateInfo.subpassCount = 1u;
     renderPassCreateInfo.pSubpasses = &subpassDescription;
+    renderPassCreateInfo.dependencyCount = static_cast<uint32_t>(subpassDependencies.size());
+    renderPassCreateInfo.pDependencies = subpassDependencies.data();
     if (vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS)
     {
       util::error(Error::GenericVulkan);

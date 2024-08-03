@@ -69,6 +69,7 @@ RenderProcess::RenderProcess(const Context* context,
 
   // Create a fence
   VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+  fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Make sure the fence starts off signaled
   if (vkCreateFence(device, &fenceCreateInfo, nullptr, &busyFence) != VK_SUCCESS)
   {
     util::error(Error::GenericVulkan);
