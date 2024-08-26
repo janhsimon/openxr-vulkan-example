@@ -28,7 +28,7 @@ public:
   {
     Error,       // An error occurred
     RenderFully, // Render this frame normally
-    SkipRender,  // Skip rendering the frame but end it
+    SkipRender,  // Process this frame but skip rendering
     SkipFully    // Skip processing this frame entirely without ending it
   };
   BeginFrameResult beginFrame(uint32_t& swapchainImageIndex);

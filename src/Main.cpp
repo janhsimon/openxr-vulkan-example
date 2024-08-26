@@ -130,57 +130,56 @@ int main()
     {
       return EXIT_FAILURE;
     }
-    else if (frameResult == Headset::BeginFrameResult::RenderFully)
+    else if (frameResult == Headset::BeginFrameResult::SkipFully)
     {
-      if (!controllers.sync(headset.getXrSpace(), headset.getXrFrameState().predictedDisplayTime))
+      continue;
+    }
+
+    if (!controllers.sync(headset.getXrSpace(), headset.getXrFrameState().predictedDisplayTime))
+    {
+      return EXIT_FAILURE;
+    }
+
+    static float time = 0.0f;
+    time += deltaTime;
+
+    // Update
+    for (size_t controllerIndex = 0u; controllerIndex < 2u; ++controllerIndex)
+    {
+      const float flySpeed = controllers.getFlySpeed(controllerIndex);
+      if (flySpeed > 0.0f)
       {
-        return EXIT_FAILURE;
-      }
-
-      static float time = 0.0f;
-      time += deltaTime;
-
-      // Update
-      for (size_t controllerIndex = 0u; controllerIndex < 2u; ++controllerIndex)
-      {
-        const float flySpeed = controllers.getFlySpeed(controllerIndex);
-        if (flySpeed > 0.0f)
-        {
-          const glm::vec3 forward = glm::normalize(controllers.getPose(controllerIndex)[2]);
-          cameraMatrix = glm::translate(cameraMatrix, forward * flySpeed * flySpeedMultiplier * deltaTime);
-        }
-      }
-
-      const glm::mat4 inverseCameraMatrix = glm::inverse(cameraMatrix);
-      handModelLeft.worldMatrix = inverseCameraMatrix * controllers.getPose(0u);
-      handModelRight.worldMatrix = inverseCameraMatrix * controllers.getPose(1u);
-      handModelRight.worldMatrix = glm::scale(handModelRight.worldMatrix, { -1.0f, 1.0f, 1.0f });
-
-      bikeModel.worldMatrix =
-        glm::rotate(glm::translate(glm::mat4(1.0f), { 0.5f, 0.0f, -4.5f }), time * 0.2f, { 0.0f, 1.0f, 0.0f });
-
-      // Render
-      renderer.render(cameraMatrix, swapchainImageIndex, time);
-
-      const MirrorView::RenderResult mirrorResult = mirrorView.render(swapchainImageIndex);
-      if (mirrorResult == MirrorView::RenderResult::Error)
-      {
-        return EXIT_FAILURE;
-      }
-
-      const bool mirrorViewVisible = (mirrorResult == MirrorView::RenderResult::Visible);
-      renderer.submit(mirrorViewVisible);
-
-      if (mirrorViewVisible)
-      {
-        mirrorView.present();
+        const glm::vec3 forward = glm::normalize(controllers.getPose(controllerIndex)[2]);
+        cameraMatrix = glm::translate(cameraMatrix, forward * flySpeed * flySpeedMultiplier * deltaTime);
       }
     }
 
-    if (frameResult == Headset::BeginFrameResult::RenderFully || frameResult == Headset::BeginFrameResult::SkipRender)
+    const glm::mat4 inverseCameraMatrix = glm::inverse(cameraMatrix);
+    handModelLeft.worldMatrix = inverseCameraMatrix * controllers.getPose(0u);
+    handModelRight.worldMatrix = inverseCameraMatrix * controllers.getPose(1u);
+    handModelRight.worldMatrix = glm::scale(handModelRight.worldMatrix, { -1.0f, 1.0f, 1.0f });
+
+    bikeModel.worldMatrix =
+      glm::rotate(glm::translate(glm::mat4(1.0f), { 0.5f, 0.0f, -4.5f }), time * 0.2f, { 0.0f, 1.0f, 0.0f });
+
+    // Render
+    renderer.render(cameraMatrix, swapchainImageIndex, time);
+
+    const MirrorView::RenderResult mirrorResult = mirrorView.render(swapchainImageIndex);
+    if (mirrorResult == MirrorView::RenderResult::Error)
     {
-      headset.endFrame();
+      return EXIT_FAILURE;
     }
+
+    const bool mirrorViewVisible = (mirrorResult == MirrorView::RenderResult::Visible);
+    renderer.submit(mirrorViewVisible);
+
+    if (mirrorViewVisible)
+    {
+      mirrorView.present();
+    }
+
+    headset.endFrame();
   }
 
   context.sync(); // Sync before destroying so that resources are free

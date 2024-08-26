@@ -496,13 +496,6 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     return BeginFrameResult::Error;
   }
 
-  if (!frameState.shouldRender)
-  {
-    // Let the host know that we don't want to render this frame
-    // We do still need to end the frame however
-    return BeginFrameResult::SkipRender;
-  }
-
   // Update the eye poses
   viewState.type = XR_TYPE_VIEW_STATE;
   uint32_t viewCount;
@@ -558,7 +551,12 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     return BeginFrameResult::Error;
   }
 
-  return BeginFrameResult::RenderFully; // Request full rendering of the frame
+  if (!frameState.shouldRender)
+  {
+    return BeginFrameResult::SkipRender;
+  }
+
+  return BeginFrameResult::RenderFully;
 }
 
 void Headset::endFrame() const
