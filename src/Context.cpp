@@ -70,7 +70,7 @@ Context::Context()
   {
     XrApplicationInfo applicationInfo;
     applicationInfo.apiVersion = XR_API_VERSION_1_0; // Do not use OpenXR 1.1 yet because some runtimes lack support
-    applicationInfo.applicationVersion = static_cast<uint32_t>(XR_MAKE_VERSION(0, 1, 0));
+    applicationInfo.applicationVersion = static_cast<uint32_t>(XR_MAKE_VERSION(1, 2, 0));
 
     memcpy(applicationInfo.applicationName, applicationName.data(), applicationName.length() + 1u);
     memset(applicationInfo.engineName, 0, 1u);
