@@ -517,6 +517,18 @@ Headset::BeginFrameResult Headset::beginFrame(uint32_t& swapchainImageIndex)
     return BeginFrameResult::Error;
   }
 
+  if ((viewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT) == 0)
+  {
+    util::error(Error::GenericOpenXR);
+    return BeginFrameResult::Error;
+  }
+
+  if ((viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0)
+  {
+    util::error(Error::GenericOpenXR);
+    return BeginFrameResult::Error;
+  }
+
   // Update the eye render infos, view and projection matrices
   for (size_t eyeIndex = 0u; eyeIndex < eyeCount; ++eyeIndex)
   {
@@ -566,6 +578,7 @@ void Headset::endFrame() const
   XrResult result = xrReleaseSwapchainImage(swapchain, &swapchainImageReleaseInfo);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return;
   }
 
@@ -576,10 +589,7 @@ void Headset::endFrame() const
   compositionLayerProjection.views = eyeRenderInfos.data();
 
   std::vector<XrCompositionLayerBaseHeader*> layers;
-
-  const bool positionValid = viewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT;
-  const bool orientationValid = viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT;
-  if (frameState.shouldRender && positionValid && orientationValid)
+  if (frameState.shouldRender)
   {
     layers.push_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&compositionLayerProjection));
   }
@@ -592,6 +602,7 @@ void Headset::endFrame() const
   result = xrEndFrame(session, &frameEndInfo);
   if (XR_FAILED(result))
   {
+    util::error(Error::GenericOpenXR);
     return;
   }
 }
